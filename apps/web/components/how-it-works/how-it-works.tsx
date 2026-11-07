@@ -8,6 +8,7 @@ import {
   AccordionTrigger,
 } from "@workspace/ui/components/accordion";
 import { buttonVariants } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
 import { HeroDiagram } from "@/components/how-it-works/hero-diagram";
 import { LanguageSwitcher } from "@/components/how-it-works/language-switcher";
 import { PaymentSteps } from "@/components/how-it-works/payment-steps";
@@ -15,10 +16,20 @@ import { RoleCard } from "@/components/how-it-works/role-card";
 import { RouteMap } from "@/components/how-it-works/route-map";
 import { copy, type Locale } from "@/components/how-it-works/copy";
 
-function Section({ title, lede, children }: { title: string; lede?: string; children: ReactNode }) {
+function Section({
+  title,
+  lede,
+  centered = false,
+  children,
+}: {
+  title: string;
+  lede?: string;
+  centered?: boolean;
+  children: ReactNode;
+}) {
   return (
     <section className="space-y-8 border-t border-border py-16">
-      <div className="max-w-2xl space-y-2">
+      <div className={cn("max-w-2xl space-y-2", centered && "mx-auto text-center")}>
         <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
         {lede && <p className="text-muted-foreground">{lede}</p>}
       </div>
@@ -34,7 +45,7 @@ function HowItWorks({ locale }: { locale: Locale }) {
     <div lang={locale} className="min-h-svh bg-background text-foreground">
       <div className="mx-auto max-w-300 px-6 sm:px-8">
         <header className="flex flex-wrap items-center justify-between gap-2 py-4">
-          <p className="text-sm font-medium">{text.brand}</p>
+          <p className="text-sm font-medium">Ponte</p>
           <LanguageSwitcher locale={locale} label={text.languageLabel} />
         </header>
         <main>
@@ -106,8 +117,8 @@ function HowItWorks({ locale }: { locale: Locale }) {
             </ul>
           </Section>
 
-          <Section title={text.faq.title}>
-            <Accordion className="max-w-2xl">
+          <Section title={text.faq.title} centered>
+            <Accordion className="mx-auto max-w-2xl">
               {text.faq.items.map((item) => (
                 <AccordionItem key={item.question}>
                   <AccordionTrigger>{item.question}</AccordionTrigger>

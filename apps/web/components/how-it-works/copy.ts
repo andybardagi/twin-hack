@@ -13,7 +13,6 @@ const en = {
       "Pay by QR with any supported Latin American stablecoin. The merchant receives the one they want.",
   },
   languageLabel: "Language",
-  brand: "Stablecoin QR payments",
   hero: {
     eyebrow: "How it works",
     title: "Pay with the stablecoin you have. Get paid in the one you want.",
@@ -200,7 +199,6 @@ const es: typeof en = {
       "Paga con QR en cualquier stablecoin latinoamericana compatible. El comercio recibe la que quiere.",
   },
   languageLabel: "Idioma",
-  brand: "Pagos QR con stablecoins",
   hero: {
     eyebrow: "Cómo funciona",
     title: "Paga con la stablecoin que tienes. Cobra en la que quieres.",
@@ -388,7 +386,6 @@ const pt: typeof en = {
       "Pague por QR com qualquer stablecoin latino-americana compatível. O comerciante recebe a que preferir.",
   },
   languageLabel: "Idioma",
-  brand: "Pagamentos QR com stablecoins",
   hero: {
     eyebrow: "Como funciona",
     title: "Pague com a stablecoin que você tem. Receba na que você quer.",
