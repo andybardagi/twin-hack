@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { SignInProvider } from "@/components/auth/sign-in-provider";
@@ -10,8 +11,14 @@ export default async function SignInPage() {
   if (session) redirect("/");
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-8 py-16 text-foreground">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background px-8 py-16 text-foreground">
       <SignInProvider />
+      <Link
+        href="/how-it-works"
+        className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+      >
+        How it works
+      </Link>
     </main>
   );
 }
