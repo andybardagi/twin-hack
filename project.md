@@ -34,12 +34,12 @@ The signing key never leaves the merchant's device, so our backend can't forge a
 - Signs in with their wallet.
 - Scans the QR. The app checks that the order was signed by the merchant's registered signing key and rejects it otherwise. Then it shows what the merchant is asking for (e.g. 15,000 ARGt).
 - Picks which of their stablecoins to pay with. The app shows a live quote for each one: amount to pay, fee, and route.
-- Signs the payment. No gas, no ETH needed. The first payment with a Twin token asks for one extra approval transaction, and we fund its gas (see [Gasless](#gasless)).
+- Signs the payment. Our relayer submits it, so the payment itself costs no gas. The first payment with a Twin token asks for one extra approval transaction, which the customer sends from their wallet and pays for in ETH (see [Gasless](#gasless)).
 - Gets a confirmation.
 
 ## Payment intent
 
-The QR carries the order, signed by the merchant's key with EIP-712: `merchant`, `receiveToken`, `receiveAmount`, `orderId`, `expiry`. `chainId` and the contract address live in the EIP-712 domain, so a signature from another chain or contract is rejected.
+The QR carries the order, signed by the merchant's key with EIP-712: `merchant`, `receiveToken`, `receiveAmount`, `orderId`, `expiry`, `feeBps`. Including `feeBps` means the merchant signs the fee, so a fee change can't affect orders already signed. `chainId` and the contract address live in the EIP-712 domain, so a signature from another chain or contract is rejected.
 
 When the customer scans it, the app adds the customer's side: `payToken`, `maxPayAmount` (the quote plus slippage), and the order hash, so the customer signs that exact order.
 
@@ -50,33 +50,32 @@ The customer signs the intent (EIP-712). Our relayer submits the order, the merc
 3. Pulls `payToken` from the customer, up to `maxPayAmount`.
 4. Routes through the Curve pools as an exact-output swap: it calls `get_dx` in the same transaction, adds a 1–2 basis point buffer, then `exchange` with `min_dy = receiveAmount`. For Twin-to-Twin, it calls `get_dx` on the second pool first (USDT0 needed), then on the first (pay token needed). Same token on both sides skips the swap.
 5. Takes our fee, then sends the rest of `receiveAmount` to the payout address: the merchant's forward address if one is set, otherwise `order.merchant`.
-6. Refunds any leftover `payToken` to the customer.
+6. Sends any swap surplus above `receiveAmount` to the treasury along with the fee. The contract pulls exactly the quoted amount, so no `payToken` is left over.
 7. Emits `PaymentSettled(merchant, orderId, payer, payToken, payAmount, receiveToken, receiveAmount, fee, payout)`.
 
 Each `orderId` can only be paid once per merchant.
 
 ## Gasless
 
-Customers never pay gas. Our relayer submits every payment, paying ETH on Arbitrum. The fee below covers it, including the one-time gas drips for Twin-token approvals.
+Customers never pay gas for a payment. Our relayer submits every payment, paying ETH on Arbitrum, and the fee below covers it. The one exception is the one-time approval for each Twin token, which the customer sends and pays for.
 
 Merchant settings (signing key, forward address) are transactions the merchant sends from their wallet, not relayed.
 
 **Paying with USDT0.** The customer signs two EIP-712 messages: a `permit` (EIP-2612) for `maxPayAmount`, and the payment intent. The relayer submits both in a single transaction. The contract calls `permit` inside try/catch and then checks the allowance, so a front-run `permit` can't block the payment.
 
-**Paying with a Twin token.** All seven Twin tokens on Arbitrum share one beacon implementation (`TwinToken.sol`). Its ERC-2771 forwarder is `address(0)` and it has no `permit`, so only the customer's own address can call `approve`. Gas drip:
+**Paying with a Twin token.** All seven Twin tokens on Arbitrum share one beacon implementation (`TwinToken.sol`). Its ERC-2771 forwarder is `address(0)` and it has no `permit`, so only the customer's own address can call `approve`. The customer needs a little ETH on Arbitrum for that one approval:
 
-- When the customer picks a Twin token they haven't approved yet, the relayer sends them just enough ETH for one `approve`.
-- The customer signs the `approve` transaction to our contract.
-- After that, each payment needs only the intent signature.
-- Abuse guard: only send to addresses that hold that Twin token and have no allowance yet, once per address and token.
+- When the customer picks a Twin token they haven't approved yet, the app checks their ETH balance. If it can't cover the `approve`, the app asks them to add ETH or pay with another token.
+- The customer sends `approve` to our contract for an unlimited amount from their wallet, paying its gas. Approving an unlimited amount means they never need to approve that token again.
+- After that, each payment with that token needs only the intent signature.
 
 ## Business model
 
 - A fee of X% per payment, deducted from the merchant's received amount when the payment settles, the same way card processors charge merchants. Target: below Mercado Pago and Pix-based processors [fill in their current rates].
 - Curve takes 0.3% per swap, about 0.6% on Twin-to-Twin payments, on top of our fee. That cost is part of the quote the customer sees, and it counts against the "below Mercado Pago" target.
-- The fee pays for gas, including the one-time drips. An Arbitrum transaction costs a few cents, so at 0.5%, a USD 20 payment earns USD 0.10.
+- The fee pays for the relayer's gas on every payment. An Arbitrum transaction costs a few cents, so at 0.5%, a USD 20 payment earns USD 0.10.
 - No capital tied up in liquidity pools, and we never hold user funds.
-- Later: FX spread on cross-currency payments, volume tiers for large merchants, and batched approve-and-pay with a sponsored-gas service (EIP-5792 + EIP-7702 + paymaster) so wallets that support it skip the extra Twin-token approval transaction.
+- Later: FX spread on cross-currency payments, volume tiers for large merchants, an in-app swap so customers can buy ETH with a stablecoin they hold (gasless from USDT0 via `permit`; from a Twin token it still needs that token's approval first), and batched approve-and-pay with a sponsored-gas service (EIP-5792 + EIP-7702 + paymaster) so wallets that support it skip the Twin-token approval transaction.
 
 ## Verified
 
@@ -88,4 +87,4 @@ Merchant settings (signing key, forward address) are transactions the merchant s
 
 ## Open
 
-- Ask the Twin mentors whether a beacon upgrade with a real forwarder (or `permit`) is planned. That would drop the gas drip for Twin-token payments.
+- Ask the Twin mentors whether a beacon upgrade with a real forwarder (or `permit`) is planned. That would let customers approve Twin tokens without holding ETH.
