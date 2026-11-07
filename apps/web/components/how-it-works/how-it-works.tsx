@@ -9,12 +9,14 @@ import {
 } from "@workspace/ui/components/accordion";
 import { buttonVariants } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
+import { BeloLogo } from "@/components/brand/belo-logo";
 import { PonteLogo } from "@/components/brand/ponte-logo";
 import { HeroDiagram } from "@/components/how-it-works/hero-diagram";
 import { LanguageSwitcher } from "@/components/how-it-works/language-switcher";
 import { PaymentSteps } from "@/components/how-it-works/payment-steps";
 import { RoleCard } from "@/components/how-it-works/role-card";
 import { RouteMap } from "@/components/how-it-works/route-map";
+import { TokenText } from "@/components/how-it-works/token-chip";
 import { copy, type Locale } from "@/components/how-it-works/copy";
 
 function Section({
@@ -23,8 +25,8 @@ function Section({
   centered = false,
   children,
 }: {
-  title: string;
-  lede?: string;
+  title: ReactNode;
+  lede?: ReactNode;
   centered?: boolean;
   children: ReactNode;
 }) {
@@ -41,14 +43,59 @@ function Section({
 
 const paymentRouterUrl = "https://arbiscan.io/address/0x4DE32c75eecDF3229114F105293698284b261Bb1";
 
-function AudienceCard({ title, children }: { title: string; children: ReactNode }) {
+function AudienceCard({
+  title,
+  tag,
+  children,
+}: {
+  title: string;
+  tag?: string;
+  children: ReactNode;
+}) {
   return (
     <article className="space-y-4 rounded-xl border border-border bg-card p-6 text-card-foreground">
-      <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+        {tag && (
+          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+            {tag}
+          </span>
+        )}
+      </div>
       {children}
     </article>
   );
 }
+
+function FeatureIcon({ children }: { children: ReactNode }) {
+  return (
+    <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-secondary-foreground">
+      {children}
+    </span>
+  );
+}
+
+function OutlineIcon({ path }: { path: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-5"
+    >
+      <path d={path} />
+    </svg>
+  );
+}
+
+// A shield with a check, and a wallet with an outgoing arrow.
+const noKycIconPath = "M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3zM9 12l2 2 4-4";
+const payoutsIconPath =
+  "M3 7h15a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7zm0 0l2-3h11M14 13.5h6";
 
 function HowItWorks({ locale }: { locale: Locale }) {
   const text = copy[locale];
@@ -88,13 +135,18 @@ function HowItWorks({ locale }: { locale: Locale }) {
 
           <Section title={text.solution.title} lede={text.solution.lede}>
             <div className="grid gap-6 md:grid-cols-2">
-              {[text.solution.customers, text.solution.merchants].map((side) => (
-                <AudienceCard key={side.title} title={side.title}>
+              {[
+                { ...text.solution.customers, tag: text.hero.customerTag },
+                { ...text.solution.merchants, tag: undefined },
+              ].map((side) => (
+                <AudienceCard key={side.title} title={side.title} tag={side.tag}>
                   <dl className="space-y-4">
                     {side.items.map((item) => (
                       <div key={item.title} className="space-y-1">
                         <dt className="font-medium">{item.title}</dt>
-                        <dd className="text-sm text-muted-foreground">{item.body}</dd>
+                        <dd className="text-sm text-muted-foreground">
+                          <TokenText>{item.body}</TokenText>
+                        </dd>
                       </div>
                     ))}
                   </dl>
@@ -104,7 +156,7 @@ function HowItWorks({ locale }: { locale: Locale }) {
           </Section>
 
           <Section title={text.steps.title} lede={text.steps.lede}>
-            <PaymentSteps text={text.steps} />
+            <PaymentSteps text={text.steps} customerTag={text.hero.customerTag} />
             <p className="text-xs text-muted-foreground">{text.steps.disclaimer}</p>
           </Section>
 
@@ -118,24 +170,47 @@ function HowItWorks({ locale }: { locale: Locale }) {
                   <p className="text-xs font-medium text-muted-foreground">{item.who}</p>
                   <p className="text-3xl font-semibold tracking-tight">{item.value}</p>
                   <h3 className="font-medium">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.body}</p>
+                  <p className="text-sm text-muted-foreground">
+                    <TokenText>{item.body}</TokenText>
+                  </p>
                 </li>
               ))}
             </ul>
             <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
               {text.business.points.map((point) => (
-                <li key={point}>{point}</li>
+                <li key={point}>
+                  <TokenText>{point}</TokenText>
+                </li>
               ))}
             </ul>
           </Section>
 
           <Section title={text.distribution.title} lede={text.distribution.lede}>
             <ul className="grid gap-6 md:grid-cols-3">
-              {text.distribution.items.map((item) => (
+              {[
+                {
+                  ...text.distribution.noKyc,
+                  icon: (
+                    <FeatureIcon>
+                      <OutlineIcon path={noKycIconPath} />
+                    </FeatureIcon>
+                  ),
+                },
+                {
+                  ...text.distribution.payouts,
+                  icon: (
+                    <FeatureIcon>
+                      <OutlineIcon path={payoutsIconPath} />
+                    </FeatureIcon>
+                  ),
+                },
+                { ...text.distribution.belo, icon: <BeloLogo className="h-10" /> },
+              ].map((item) => (
                 <li
                   key={item.title}
-                  className="space-y-2 rounded-xl border border-border bg-card p-6 text-card-foreground"
+                  className="space-y-3 rounded-xl border border-border bg-card p-6 text-card-foreground"
                 >
+                  {item.icon}
                   <h3 className="font-medium">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.body}</p>
                 </li>
@@ -143,7 +218,10 @@ function HowItWorks({ locale }: { locale: Locale }) {
             </ul>
           </Section>
 
-          <Section title={text.routing.title} lede={text.routing.lede}>
+          <Section
+            title={<TokenText>{text.routing.title}</TokenText>}
+            lede={<TokenText>{text.routing.lede}</TokenText>}
+          >
             <RouteMap text={text.routing} />
           </Section>
 
@@ -185,7 +263,7 @@ function HowItWorks({ locale }: { locale: Locale }) {
                 <AccordionItem key={item.question}>
                   <AccordionTrigger>{item.question}</AccordionTrigger>
                   <AccordionContent className="text-muted-foreground">
-                    {item.answer}
+                    <TokenText>{item.answer}</TokenText>
                   </AccordionContent>
                 </AccordionItem>
               ))}

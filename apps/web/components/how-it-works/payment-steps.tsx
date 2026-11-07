@@ -5,23 +5,41 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { CheckIcon } from "@/components/how-it-works/icons";
 import { QrArt } from "@/components/how-it-works/qr-art";
-import { TokenChip } from "@/components/how-it-works/token-chip";
+import { TokenLogo, TokenText } from "@/components/how-it-works/token-chip";
 import type { Copy } from "@/components/how-it-works/copy";
 
 type Mock = Copy["steps"]["mock"];
 
-const stepDurationMs = 3500;
+const stepDurationMs = 4000;
+const keypadKeys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"];
 
-function Phone({ label, stage, children }: { label: string; stage: number; children: ReactNode }) {
+function Phone({
+  label,
+  tag,
+  stage,
+  children,
+}: {
+  label: string;
+  tag?: string;
+  stage: number;
+  children: ReactNode;
+}) {
   return (
     <figure className="flex flex-col items-center gap-3">
-      <figcaption className="text-sm font-medium text-muted-foreground">{label}</figcaption>
+      <figcaption className="flex min-h-12 flex-col items-center gap-1 text-center text-sm font-medium text-muted-foreground">
+        {label}
+        {tag && (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+            {tag}
+          </span>
+        )}
+      </figcaption>
       <div
         aria-hidden
-        className="flex h-96 w-full max-w-60 flex-col rounded-3xl border border-border bg-card p-4 text-card-foreground shadow-sm"
+        className="flex h-112 w-full max-w-64 flex-col overflow-hidden rounded-[2rem] border border-border bg-background p-3 text-foreground shadow-sm"
       >
-        <div className="mx-auto mb-4 h-1 w-10 shrink-0 rounded-full bg-border" />
-        <div key={stage} className="flex flex-1 animate-in flex-col duration-500 fade-in">
+        <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-border" />
+        <div key={stage} className="flex min-h-0 flex-1 animate-in flex-col duration-500 fade-in">
           {children}
         </div>
       </div>
@@ -29,125 +47,184 @@ function Phone({ label, stage, children }: { label: string; stage: number; child
   );
 }
 
-function MerchantScreen({ mock, status }: { mock: Mock; status: string }) {
+/** Mirrors the token chip and amount from the app's order screens. */
+function OrderAmount({ amount, size = "md" }: { amount: string; size?: "md" | "lg" }) {
   return (
-    <>
-      <p className="text-center text-xs text-muted-foreground">{mock.newCharge}</p>
-      <p className="mt-1 text-center text-xl font-semibold tracking-tight">{mock.amount} ARGt</p>
-      <div className="mt-4 flex flex-1 items-center justify-center">
-        <QrArt className="size-36" />
-      </div>
-      <p className="text-center text-xs text-muted-foreground">{status}</p>
-    </>
-  );
-}
-
-function ScanScreen({ mock, verified }: { mock: Mock; verified: boolean }) {
-  return (
-    <>
-      <p className="text-center text-xs text-muted-foreground">{mock.scanning}</p>
-      <div className="relative mx-auto mt-3 flex size-36 items-center justify-center">
-        <QrArt className="size-28 opacity-40" />
-        <span className="absolute top-0 left-0 size-5 rounded-tl-lg border-t-2 border-l-2 border-foreground" />
-        <span className="absolute top-0 right-0 size-5 rounded-tr-lg border-t-2 border-r-2 border-foreground" />
-        <span className="absolute bottom-0 left-0 size-5 rounded-bl-lg border-b-2 border-l-2 border-foreground" />
-        <span className="absolute right-0 bottom-0 size-5 rounded-br-lg border-r-2 border-b-2 border-foreground" />
-      </div>
-      {verified ? (
-        <div className="mt-auto space-y-2 rounded-xl bg-muted p-3 text-center">
-          <p className="flex items-center justify-center gap-1 text-xs font-medium">
-            <CheckIcon className="size-3.5" />
-            {mock.verified}
-          </p>
-          <p className="text-xs text-muted-foreground">{mock.merchantAsks}</p>
-          <p className="text-base font-semibold tracking-tight">{mock.amount} ARGt</p>
-        </div>
-      ) : (
-        <p className="mt-auto text-center text-xs text-muted-foreground">{mock.waitingScan}</p>
-      )}
-    </>
-  );
-}
-
-function QuoteRow({
-  symbol,
-  amount,
-  route,
-  selected = false,
-}: {
-  symbol: string;
-  amount: string;
-  route: string;
-  selected?: boolean;
-}) {
-  return (
-    <div
-      data-selected={selected}
-      className="flex items-center justify-between gap-2 rounded-xl border border-border p-2 data-[selected=true]:border-foreground"
-    >
-      <TokenChip symbol={symbol} className="px-2 py-0.5" />
-      <div className="text-right">
-        <p className="text-xs font-medium">{amount}</p>
-        <p className="text-[0.7rem] text-muted-foreground">{route}</p>
-      </div>
-    </div>
-  );
-}
-
-function PickScreen({ mock }: { mock: Mock }) {
-  return (
-    <>
-      <p className="text-center text-xs text-muted-foreground">
-        {mock.merchantAsks} {mock.amount} ARGt
-      </p>
-      <p className="mt-4 mb-2 text-sm font-medium">{mock.payWith}</p>
-      <div className="flex flex-col gap-2">
-        <QuoteRow symbol="BRAt" amount={mock.bratQuote} route={mock.twoSwaps} selected />
-        <QuoteRow symbol="USDT" amount={mock.usdtQuote} route={mock.oneSwap} />
-        <QuoteRow symbol="ARGt" amount={mock.amount} route={mock.direct} />
-      </div>
-      <div className="mt-auto rounded-lg bg-primary py-2 text-center text-xs font-medium text-primary-foreground">
-        {mock.sign}
-      </div>
-    </>
-  );
-}
-
-function DoneScreen({ mock }: { mock: Mock }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-      <span className="flex size-14 animate-in items-center justify-center rounded-full bg-primary text-primary-foreground duration-500 zoom-in-50">
-        <CheckIcon className="size-7" />
+    <div className="flex flex-col items-center gap-2">
+      <span className="flex items-center gap-1.5 rounded-full border border-border bg-card py-0.5 pr-2 pl-0.5 text-[0.65rem]">
+        <TokenLogo symbol="ARGt" />
+        <span className="font-mono font-medium">ARGt</span>
+        <span className="text-muted-foreground">Argentine peso</span>
       </span>
-      <p className="text-base font-semibold tracking-tight">{mock.paid}</p>
-      <p className="text-sm">{mock.amount} ARGt</p>
-      <p className="text-xs text-muted-foreground">{mock.order}</p>
+      <p
+        className={cn(
+          "font-heading leading-none font-medium tracking-tight tabular-nums",
+          size === "lg" ? "text-3xl" : "text-2xl",
+        )}
+      >
+        {amount}
+      </p>
     </div>
   );
 }
 
-function PaymentSteps({ text }: { text: Copy["steps"] }) {
+function SheetHeader({ title }: { title: string }) {
+  return (
+    <p className="mb-2 grid grid-cols-[1rem_1fr_1rem] items-center text-center text-xs font-semibold">
+      <span className="text-muted-foreground">‹</span>
+      {title}
+    </p>
+  );
+}
+
+function KeypadScreen({ mock }: { mock: Mock }) {
+  return (
+    <>
+      <div className="flex flex-1 flex-col items-center justify-center gap-3">
+        <OrderAmount amount={mock.amount} size="lg" />
+        <p className="text-[0.65rem] text-muted-foreground">{mock.enterAmount}</p>
+      </div>
+      <div className="grid grid-cols-3 gap-1">
+        {keypadKeys.map((key) => (
+          <span
+            key={key}
+            className={cn(
+              "grid h-8 place-items-center rounded-lg text-sm font-medium",
+              key === "." || key === "⌫" ? "text-muted-foreground" : "bg-muted",
+            )}
+          >
+            {key}
+          </span>
+        ))}
+      </div>
+      <span className="mt-2 grid h-9 place-items-center rounded-xl bg-primary text-[0.65rem] font-medium text-primary-foreground">
+        {mock.createOrder} · {mock.amount} ARGt
+      </span>
+    </>
+  );
+}
+
+function StatusPill({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-1 text-[0.65rem] font-medium">
+      <span className="size-1.5 rounded-full bg-primary motion-safe:animate-pulse" />
+      {children}
+    </span>
+  );
+}
+
+function OrderQrScreen({ mock }: { mock: Mock }) {
+  return (
+    <>
+      <SheetHeader title={mock.order} />
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+        <OrderAmount amount={mock.amount} />
+        <div className="rounded-2xl border border-border bg-white p-2 text-black">
+          <QrArt className="size-24 fill-black" />
+        </div>
+        <span className="rounded-full border border-border px-2 py-1 text-[0.6rem]">
+          {mock.copyLink}
+        </span>
+        <StatusPill>
+          {mock.waitingPayment} · <span className="font-mono tabular-nums">04:58</span>
+        </StatusPill>
+        <p className="max-w-[24ch] text-[0.6rem] text-muted-foreground">{mock.showCode}</p>
+      </div>
+    </>
+  );
+}
+
+function CameraScreen({ mock, scanning }: { mock: Mock; scanning: boolean }) {
+  return (
+    <div className="-m-3 -mt-7 flex flex-1 flex-col items-center justify-center gap-4 bg-neutral-900 p-3 text-white">
+      <p className="text-[0.65rem] opacity-80">{scanning ? mock.scanning : mock.waitingScan}</p>
+      <div className="relative flex size-36 items-center justify-center">
+        {scanning && (
+          <span className="rounded-lg bg-white p-1.5">
+            <QrArt className="size-24 fill-black" />
+          </span>
+        )}
+        <span className="absolute top-0 left-0 size-5 rounded-tl-lg border-t-2 border-l-2 border-white" />
+        <span className="absolute top-0 right-0 size-5 rounded-tr-lg border-t-2 border-r-2 border-white" />
+        <span className="absolute bottom-0 left-0 size-5 rounded-bl-lg border-b-2 border-l-2 border-white" />
+        <span className="absolute right-0 bottom-0 size-5 rounded-br-lg border-r-2 border-b-2 border-white" />
+      </div>
+    </div>
+  );
+}
+
+function PayScreen({ mock, picking }: { mock: Mock; picking: boolean }) {
+  return (
+    <div className="flex flex-1 flex-col gap-3 rounded-xl border border-border bg-card p-3 text-card-foreground">
+      <p className="text-sm font-semibold tracking-tight">{mock.paymentRequest}</p>
+      <OrderAmount amount={mock.amount} />
+      <p className="flex items-start gap-1 text-[0.6rem] text-muted-foreground">
+        <CheckIcon className="size-3 text-primary" />
+        {mock.verified}
+      </p>
+      {picking && (
+        <div className="mt-auto flex flex-col gap-2">
+          <p className="text-[0.65rem] font-medium">{mock.payWith}</p>
+          <span className="flex items-center gap-2 rounded-lg border border-border bg-background px-2 py-1.5">
+            <TokenLogo symbol="BRAt" className="size-6" />
+            <span className="grid flex-1 leading-tight">
+              <span className="font-mono text-[0.65rem] font-medium">BRAt</span>
+              <span className="text-[0.6rem] text-muted-foreground">Brazilian real</span>
+            </span>
+            <span className="text-muted-foreground">⌄</span>
+          </span>
+          <p className="text-[0.6rem] text-muted-foreground">
+            <TokenText>{mock.quote}</TokenText>
+          </p>
+          <span className="grid h-8 place-items-center rounded-lg bg-primary text-[0.65rem] font-medium text-primary-foreground">
+            {mock.payButton}
+          </span>
+          <p className="text-[0.6rem] text-muted-foreground">{mock.signing}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfirmedScreen({ title, mock }: { title: string; mock: Mock }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+      <span className="grid size-16 animate-in place-items-center rounded-full bg-primary text-primary-foreground duration-500 zoom-in-50">
+        <CheckIcon className="size-8" />
+      </span>
+      <p className="font-heading text-base font-semibold tracking-tight">{title}</p>
+      <OrderAmount amount={mock.amount} />
+    </div>
+  );
+}
+
+function PaymentSteps({ text, customerTag }: { text: Copy["steps"]; customerTag: string }) {
   const { mock } = text;
   const steps = [
     {
-      ...text.merchant,
-      merchantScreen: <MerchantScreen mock={mock} status={mock.scanToPay} />,
-      customerScreen: <ScanScreen mock={mock} verified={false} />,
+      ...text.charge,
+      merchantScreen: <KeypadScreen mock={mock} />,
+      customerScreen: <CameraScreen mock={mock} scanning={false} />,
+    },
+    {
+      ...text.qr,
+      merchantScreen: <OrderQrScreen mock={mock} />,
+      customerScreen: <CameraScreen mock={mock} scanning />,
     },
     {
       ...text.scan,
-      merchantScreen: <MerchantScreen mock={mock} status={mock.waitingPayment} />,
-      customerScreen: <ScanScreen mock={mock} verified />,
+      merchantScreen: <OrderQrScreen mock={mock} />,
+      customerScreen: <PayScreen mock={mock} picking={false} />,
     },
     {
       ...text.pick,
-      merchantScreen: <MerchantScreen mock={mock} status={mock.waitingPayment} />,
-      customerScreen: <PickScreen mock={mock} />,
+      merchantScreen: <OrderQrScreen mock={mock} />,
+      customerScreen: <PayScreen mock={mock} picking />,
     },
     {
       ...text.done,
-      merchantScreen: <DoneScreen mock={mock} />,
-      customerScreen: <DoneScreen mock={mock} />,
+      merchantScreen: <ConfirmedScreen title={mock.paymentReceived} mock={mock} />,
+      customerScreen: <ConfirmedScreen title={mock.paid} mock={mock} />,
     },
   ];
   const [stage, setStage] = useState(0);
@@ -186,7 +263,7 @@ function PaymentSteps({ text }: { text: Copy["steps"] }) {
         <Phone label={mock.merchantPhone} stage={stage}>
           {step.merchantScreen}
         </Phone>
-        <Phone label={mock.customerPhone} stage={stage}>
+        <Phone label={mock.customerPhone} tag={customerTag} stage={stage}>
           {step.customerScreen}
         </Phone>
       </div>
@@ -198,7 +275,7 @@ function PaymentSteps({ text }: { text: Copy["steps"] }) {
               aria-current={index === stage ? "step" : undefined}
               onClick={() => setStage(index)}
               className={cn(
-                "flex w-full gap-3 rounded-xl border p-4 text-left transition-colors",
+                "relative flex w-full gap-3 overflow-hidden rounded-xl border p-4 text-left transition-colors",
                 index === stage
                   ? "border-foreground bg-card"
                   : "border-transparent opacity-60 hover:opacity-100",
@@ -211,6 +288,20 @@ function PaymentSteps({ text }: { text: Copy["steps"] }) {
                 <span className="block font-medium">{item.title}</span>
                 <span className="block text-sm text-muted-foreground">{item.body}</span>
               </span>
+              {index === stage &&
+                isVisible && (
+                  // Fills over the same time as the auto-advance timer, and restarts with it.
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 bottom-0 h-0.5 bg-border motion-reduce:hidden"
+                  >
+                    <span
+                      key={stage}
+                      style={{ animationDuration: `${stepDurationMs}ms` }}
+                      className="block h-full animate-in bg-primary ease-linear fill-mode-both slide-in-from-left-full"
+                    />
+                  </span>
+                )}
             </button>
           </li>
         ))}

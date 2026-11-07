@@ -18,13 +18,14 @@ const en = {
     title: "Keep custody of your money. Pay in seconds with any stablecoin.",
     lede: "Customers pay by QR from their own wallet, with whatever stablecoin they hold. No gas, no swaps to manage, no KYC. Merchants get paid in seconds, in the currency they choose, for 0.5%.",
     diagramLabel:
-      "A customer pays in BRAt, the payment converts it in one transaction, and the merchant receives ARGt.",
+      "A self-custodial customer pays in any stablecoin, the payment converts it in the same transaction, and the merchant receives the stablecoin they chose.",
     customer: "Customer",
-    paysIn: "pays in",
+    customerTag: "Self-custodial wallet · No KYC",
+    paysIn: "pays in any stablecoin",
     converted: "Converted automatically",
     sameTransaction: "in the same transaction",
     merchant: "Merchant",
-    receives: "receives",
+    receives: "receives the one they choose",
   },
   problem: {
     title: "The problem",
@@ -88,45 +89,49 @@ const en = {
     },
   },
   steps: {
-    title: "What you'll see in the demo",
+    title: "How a payment works",
     lede: "A merchant in Buenos Aires charges a customer who holds Brazilian reais.",
     disclaimer: "Amounts are illustrative. Real quotes follow live market rates.",
-    merchant: {
-      title: "The merchant shows a QR",
-      body: "They enter the amount in the currency they get paid in. The app signs the order automatically, with no wallet popup, and turns it into a QR.",
+    charge: {
+      title: "The merchant enters the amount",
+      body: "They type it on the keypad, in the stablecoin they get paid in. The app signs the order on their device, with no wallet popup.",
+    },
+    qr: {
+      title: "A QR appears",
+      body: "The signed order turns into a QR. The merchant's screen waits for the payment and updates in real time.",
     },
     scan: {
       title: "The customer scans it",
-      body: "The app checks that the QR really comes from that merchant, then shows what they're asking for. A forged QR gets rejected.",
+      body: "From their own wallet, with no account and no ID. The app checks that the QR really comes from that merchant, and rejects a forged one.",
     },
     pick: {
       title: "The customer picks how to pay",
-      body: "Each stablecoin shows a live quote with the amount, fee and route. One signature and it's sent. No gas, no ETH.",
+      body: "Any stablecoin they hold, with a live quote that includes the swaps. One signature and it's sent. No gas, no ETH.",
     },
     done: {
       title: "Both sides get confirmed",
       body: "The payment settles on Arbitrum in a single transaction. The merchant sees it in real time.",
     },
     mock: {
-      newCharge: "New charge",
-      amount: "15,000",
-      scanToPay: "Scan to pay",
+      amount: "15,000.00",
+      enterAmount: "Enter the amount to charge.",
+      createOrder: "Create order",
+      order: "Order",
+      waitingPayment: "Waiting for payment",
+      showCode: "Your customer scans this code and pays from their wallet.",
+      copyLink: "Copy payment link",
+      waitingScan: "Point the camera at the QR",
       scanning: "Scanning",
-      verified: "Signed by the merchant",
-      merchantAsks: "The merchant asks for",
+      paymentRequest: "Payment request",
+      verified: "Verified: signed by the merchant's registered device.",
       payWith: "Pay with",
-      bratQuote: "57.40",
-      usdtQuote: "10.40",
-      twoSwaps: "2 swaps",
-      oneSwap: "1 swap",
-      direct: "Direct",
-      sign: "Sign payment",
+      quote: "You pay about 57.40 BRAt (at most 57.69). No gas needed.",
+      payButton: "Pay with your wallet",
+      signing: "Sign the payment in your wallet. It costs no gas.",
+      paymentReceived: "Payment received",
       paid: "Order paid",
-      order: "Order #1042",
       merchantPhone: "Merchant",
       customerPhone: "Customer",
-      waitingScan: "Point the camera at the QR",
-      waitingPayment: "Waiting for payment",
     },
   },
   business: {
@@ -161,20 +166,18 @@ const en = {
   distribution: {
     title: "Distribution",
     lede: "Nothing stands between a merchant and their first sale.",
-    items: [
-      {
-        title: "No KYC, no sign-up",
-        body: "A wallet is the account. Merchants start charging in minutes, with no forms or ID checks.",
-      },
-      {
-        title: "Payouts to any address",
-        body: "Merchants can send every payment to another address they set on-chain, like a treasury or an exchange account.",
-      },
-      {
-        title: "Cash out to fiat with Belo",
-        body: "Point payouts at a Belo address and convert them to pesos at no cost.",
-      },
-    ],
+    noKyc: {
+      title: "No KYC, no sign-up",
+      body: "A wallet is the account. Merchants start charging in minutes, with no forms or ID checks.",
+    },
+    payouts: {
+      title: "Payouts to any address",
+      body: "Merchants can send every payment to another address they set on-chain, like a treasury or an exchange account.",
+    },
+    belo: {
+      title: "Cash out to fiat with Belo",
+      body: "Point payouts at a Belo address and convert them to pesos at no cost.",
+    },
   },
   routing: {
     title: "USDT connects every currency",
@@ -249,11 +252,6 @@ const en = {
     title: "Common questions",
     items: [
       {
-        question: "What are Twin tokens?",
-        answer:
-          "Stablecoins that bring local currencies onchain: ARGt (Argentine peso), BRAt (Brazilian real), COLt (Colombian peso), PERt (Peruvian sol), MEXt (Mexican peso), CHLt (Chilean peso) and BOLt (Bolivian boliviano).",
-      },
-      {
         question: "Why does my first Twin token payment have an extra step?",
         answer:
           "Twin tokens need one approval transaction from your own wallet before a contract can move them. It needs a little ETH on Arbitrum for gas, and you only do it once per token. USDT doesn't need this step.",
@@ -284,13 +282,14 @@ const es: typeof en = {
     title: "Conserva la custodia de tu dinero. Paga en segundos con cualquier stablecoin.",
     lede: "El cliente paga con QR desde su propia wallet, con la stablecoin que tenga. Sin gas, sin swaps manuales, sin KYC. El comercio cobra en segundos, en la moneda que elige, por 0,5%.",
     diagramLabel:
-      "Un cliente paga en BRAt, el pago lo convierte en una sola transacción y el comercio recibe ARGt.",
+      "Un cliente con wallet en autocustodia paga con cualquier stablecoin, el pago la convierte en la misma transacción y el comercio recibe la stablecoin que eligió.",
     customer: "Cliente",
-    paysIn: "paga en",
+    customerTag: "Wallet en autocustodia · Sin KYC",
+    paysIn: "paga con cualquier stablecoin",
     converted: "Conversión automática",
     sameTransaction: "en la misma transacción",
     merchant: "Comercio",
-    receives: "recibe",
+    receives: "recibe la que elige",
   },
   problem: {
     title: "El problema",
@@ -354,45 +353,49 @@ const es: typeof en = {
     },
   },
   steps: {
-    title: "Lo que vas a ver en la demo",
+    title: "Cómo funciona un pago",
     lede: "Un comercio de Buenos Aires le cobra a un cliente que tiene reales brasileños.",
     disclaimer: "Los montos son ilustrativos. Las cotizaciones reales siguen el mercado en vivo.",
-    merchant: {
-      title: "El comercio muestra un QR",
-      body: "Ingresa el monto en la moneda en la que cobra. La app firma la orden sola, sin ventanas de la wallet, y la convierte en un QR.",
+    charge: {
+      title: "El comercio ingresa el monto",
+      body: "Lo escribe en el teclado, en la stablecoin en la que cobra. La app firma la orden en su dispositivo, sin ventanas de la wallet.",
+    },
+    qr: {
+      title: "Aparece un QR",
+      body: "La orden firmada se convierte en un QR. La pantalla del comercio espera el pago y se actualiza en tiempo real.",
     },
     scan: {
       title: "El cliente lo escanea",
-      body: "La app comprueba que el QR viene de ese comercio y muestra lo que pide. Un QR falsificado se rechaza.",
+      body: "Desde su propia wallet, sin cuenta ni documento. La app comprueba que el QR viene de ese comercio y rechaza uno falsificado.",
     },
     pick: {
       title: "El cliente elige cómo pagar",
-      body: "Cada stablecoin muestra una cotización en vivo con monto, comisión y ruta. Una firma y listo. Sin gas ni ETH.",
+      body: "Con cualquier stablecoin que tenga, con una cotización en vivo que incluye los swaps. Una firma y listo. Sin gas ni ETH.",
     },
     done: {
       title: "Ambos reciben la confirmación",
       body: "El pago se liquida en Arbitrum en una sola transacción. El comercio lo ve en tiempo real.",
     },
     mock: {
-      newCharge: "Nuevo cobro",
-      amount: "15.000",
-      scanToPay: "Escanea para pagar",
+      amount: "15.000,00",
+      enterAmount: "Ingresa el monto a cobrar.",
+      createOrder: "Crear orden",
+      order: "Orden",
+      waitingPayment: "Esperando el pago",
+      showCode: "Tu cliente escanea este código y paga desde su wallet.",
+      copyLink: "Copiar link de pago",
+      waitingScan: "Apunta la cámara al QR",
       scanning: "Escaneando",
-      verified: "Firmado por el comercio",
-      merchantAsks: "El comercio pide",
+      paymentRequest: "Solicitud de pago",
+      verified: "Verificada: firmada por el dispositivo registrado del comercio.",
       payWith: "Pagar con",
-      bratQuote: "57,40",
-      usdtQuote: "10,40",
-      twoSwaps: "2 swaps",
-      oneSwap: "1 swap",
-      direct: "Directo",
-      sign: "Firmar pago",
+      quote: "Pagas aprox. 57,40 BRAt (como máximo 57,69). Sin gas.",
+      payButton: "Pagar con tu wallet",
+      signing: "Firma el pago en tu wallet. No cuesta gas.",
+      paymentReceived: "Pago recibido",
       paid: "Orden pagada",
-      order: "Orden n.º 1042",
       merchantPhone: "Comercio",
       customerPhone: "Cliente",
-      waitingScan: "Apunta la cámara al QR",
-      waitingPayment: "Esperando el pago",
     },
   },
   business: {
@@ -427,20 +430,18 @@ const es: typeof en = {
   distribution: {
     title: "Distribución",
     lede: "Nada se interpone entre un comercio y su primera venta.",
-    items: [
-      {
-        title: "Sin KYC ni registro",
-        body: "La wallet es la cuenta. Un comercio empieza a cobrar en minutos, sin formularios ni verificación de identidad.",
-      },
-      {
-        title: "Cobro en cualquier dirección",
-        body: "El comercio puede enviar cada pago a otra dirección que define on-chain, como una tesorería o una cuenta de exchange.",
-      },
-      {
-        title: "A fiat con Belo",
-        body: "Apunta los cobros a una dirección de Belo y conviértelos a pesos sin costo.",
-      },
-    ],
+    noKyc: {
+      title: "Sin KYC ni registro",
+      body: "La wallet es la cuenta. Un comercio empieza a cobrar en minutos, sin formularios ni verificación de identidad.",
+    },
+    payouts: {
+      title: "Cobro en cualquier dirección",
+      body: "El comercio puede enviar cada pago a otra dirección que define on-chain, como una tesorería o una cuenta de exchange.",
+    },
+    belo: {
+      title: "A fiat con Belo",
+      body: "Apunta los cobros a una dirección de Belo y conviértelos a pesos sin costo.",
+    },
   },
   routing: {
     title: "USDT conecta todas las monedas",
@@ -515,11 +516,6 @@ const es: typeof en = {
     title: "Preguntas frecuentes",
     items: [
       {
-        question: "¿Qué son los tokens Twin?",
-        answer:
-          "Stablecoins que llevan monedas locales onchain: ARGt (peso argentino), BRAt (real brasileño), COLt (peso colombiano), PERt (sol peruano), MEXt (peso mexicano), CHLt (peso chileno) y BOLt (boliviano).",
-      },
-      {
         question: "¿Por qué mi primer pago con un token Twin tiene un paso más?",
         answer:
           "Los tokens Twin necesitan una transacción de aprobación desde tu propia wallet antes de que un contrato pueda moverlos. Requiere un poco de ETH en Arbitrum para el gas, y solo lo haces una vez por token. USDT no necesita este paso.",
@@ -550,13 +546,14 @@ const pt: typeof en = {
     title: "Mantenha a custódia do seu dinheiro. Pague em segundos com qualquer stablecoin.",
     lede: "O cliente paga por QR da própria carteira, com a stablecoin que tiver. Sem gas, sem swaps manuais, sem KYC. O comerciante recebe em segundos, na moeda que escolher, por 0,5%.",
     diagramLabel:
-      "Um cliente paga em BRAt, o pagamento converte em uma única transação e o comerciante recebe ARGt.",
+      "Um cliente com carteira autocustodial paga com qualquer stablecoin, o pagamento converte na mesma transação e o comerciante recebe a stablecoin que escolheu.",
     customer: "Cliente",
-    paysIn: "paga em",
+    customerTag: "Carteira autocustodial · Sem KYC",
+    paysIn: "paga com qualquer stablecoin",
     converted: "Conversão automática",
     sameTransaction: "na mesma transação",
     merchant: "Comerciante",
-    receives: "recebe",
+    receives: "recebe a que escolher",
   },
   problem: {
     title: "O problema",
@@ -620,45 +617,49 @@ const pt: typeof en = {
     },
   },
   steps: {
-    title: "O que você vai ver na demo",
+    title: "Como funciona um pagamento",
     lede: "Um comerciante de Buenos Aires cobra um cliente que tem reais brasileiros.",
     disclaimer: "Os valores são ilustrativos. As cotações reais seguem o mercado ao vivo.",
-    merchant: {
-      title: "O comerciante mostra um QR",
-      body: "Ele informa o valor na moeda em que recebe. O app assina o pedido sozinho, sem pop-up da carteira, e o transforma em um QR.",
+    charge: {
+      title: "O comerciante informa o valor",
+      body: "Ele digita no teclado, na stablecoin em que recebe. O app assina o pedido no dispositivo dele, sem pop-up da carteira.",
+    },
+    qr: {
+      title: "Aparece um QR",
+      body: "O pedido assinado vira um QR. A tela do comerciante aguarda o pagamento e atualiza em tempo real.",
     },
     scan: {
       title: "O cliente escaneia",
-      body: "O app confere se o QR veio mesmo daquele comerciante e mostra o que ele pede. Um QR falsificado é rejeitado.",
+      body: "Da própria carteira, sem conta e sem documento. O app confere se o QR veio mesmo daquele comerciante e rejeita um falsificado.",
     },
     pick: {
       title: "O cliente escolhe como pagar",
-      body: "Cada stablecoin mostra uma cotação ao vivo com valor, taxa e rota. Uma assinatura e pronto. Sem gas, sem ETH.",
+      body: "Com qualquer stablecoin que tiver, com uma cotação ao vivo que já inclui os swaps. Uma assinatura e pronto. Sem gas, sem ETH.",
     },
     done: {
       title: "Os dois lados recebem a confirmação",
       body: "O pagamento é liquidado na Arbitrum em uma única transação. O comerciante vê em tempo real.",
     },
     mock: {
-      newCharge: "Nova cobrança",
-      amount: "15.000",
-      scanToPay: "Escaneie para pagar",
+      amount: "15.000,00",
+      enterAmount: "Informe o valor a cobrar.",
+      createOrder: "Criar pedido",
+      order: "Pedido",
+      waitingPayment: "Aguardando o pagamento",
+      showCode: "Seu cliente escaneia este código e paga da carteira dele.",
+      copyLink: "Copiar link de pagamento",
+      waitingScan: "Aponte a câmera para o QR",
       scanning: "Escaneando",
-      verified: "Assinado pelo comerciante",
-      merchantAsks: "O comerciante pede",
+      paymentRequest: "Pedido de pagamento",
+      verified: "Verificado: assinado pelo dispositivo registrado do comerciante.",
       payWith: "Pagar com",
-      bratQuote: "57,40",
-      usdtQuote: "10,40",
-      twoSwaps: "2 swaps",
-      oneSwap: "1 swap",
-      direct: "Direto",
-      sign: "Assinar pagamento",
+      quote: "Você paga cerca de 57,40 BRAt (no máximo 57,69). Sem gas.",
+      payButton: "Pagar com a sua carteira",
+      signing: "Assine o pagamento na sua carteira. Não custa gas.",
+      paymentReceived: "Pagamento recebido",
       paid: "Pedido pago",
-      order: "Pedido nº 1042",
       merchantPhone: "Comerciante",
       customerPhone: "Cliente",
-      waitingScan: "Aponte a câmera para o QR",
-      waitingPayment: "Aguardando o pagamento",
     },
   },
   business: {
@@ -693,20 +694,18 @@ const pt: typeof en = {
   distribution: {
     title: "Distribuição",
     lede: "Nada fica entre o comerciante e a primeira venda.",
-    items: [
-      {
-        title: "Sem KYC, sem cadastro",
-        body: "A carteira é a conta. O comerciante começa a cobrar em minutos, sem formulários nem verificação de identidade.",
-      },
-      {
-        title: "Recebimento em qualquer endereço",
-        body: "O comerciante pode enviar cada pagamento para outro endereço definido on-chain, como uma tesouraria ou uma conta de exchange.",
-      },
-      {
-        title: "Para fiat com a Belo",
-        body: "Aponte os recebimentos para um endereço da Belo e converta para pesos sem custo.",
-      },
-    ],
+    noKyc: {
+      title: "Sem KYC, sem cadastro",
+      body: "A carteira é a conta. O comerciante começa a cobrar em minutos, sem formulários nem verificação de identidade.",
+    },
+    payouts: {
+      title: "Recebimento em qualquer endereço",
+      body: "O comerciante pode enviar cada pagamento para outro endereço definido on-chain, como uma tesouraria ou uma conta de exchange.",
+    },
+    belo: {
+      title: "Para fiat com a Belo",
+      body: "Aponte os recebimentos para um endereço da Belo e converta para pesos sem custo.",
+    },
   },
   routing: {
     title: "USDT conecta todas as moedas",
@@ -780,11 +779,6 @@ const pt: typeof en = {
   faq: {
     title: "Perguntas frequentes",
     items: [
-      {
-        question: "O que são tokens Twin?",
-        answer:
-          "Stablecoins que levam moedas locais para onchain: ARGt (peso argentino), BRAt (real brasileiro), COLt (peso colombiano), PERt (sol peruano), MEXt (peso mexicano), CHLt (peso chileno) e BOLt (boliviano).",
-      },
       {
         question: "Por que meu primeiro pagamento com um token Twin tem um passo a mais?",
         answer:
