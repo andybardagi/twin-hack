@@ -45,6 +45,11 @@
         "config": "postcss.config.mjs"
       },
       "ignoreDependencies": ["next-themes", "zod", "@turbo/gen"]
+    },
+    "packages/payments": {
+      "entry": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.test.ts"],
+      "project": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "*.ts"],
+      "ignoreBinaries": ["anvil", "forge"]
     }
   }
 }

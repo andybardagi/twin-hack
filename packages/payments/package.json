@@ -1,0 +1,26 @@
+{
+  "name": "@workspace/payments",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "lint": "oxlint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "gen:abi": "tsx scripts/gen-abi.ts && oxfmt src/abi.ts",
+    "demo:pay": "tsx scripts/demo-pay.ts"
+  },
+  "dependencies": {
+    "viem": "^2.57.16"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.41",
+    "@workspace/typescript-config": "workspace:*",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
