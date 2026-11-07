@@ -1,4 +1,4 @@
-import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import { v7 } from "uuid";
 import { z } from "zod";
 
@@ -35,6 +35,13 @@ export const drizzleOrderRepository: OrderRepository = {
       .limit(1);
     return order ?? null;
   },
+  async listByMerchant(merchantId) {
+    return getDb()
+      .select()
+      .from(orders)
+      .where(and(eq(orders.merchantId, merchantId), isNotNull(orders.signature)))
+      .orderBy(desc(orders.createdAt));
+  },
   async attachSignature(id, signature) {
     const [order] = await getDb()
       .update(orders)
@@ -43,16 +50,18 @@ export const drizzleOrderRepository: OrderRepository = {
       .returning();
     return order ?? null;
   },
-  async markSettled(id) {
+  async markSettled(id, payment) {
     const [settled] = await getDb()
       .update(orders)
-      .set({ settledAt: new Date() })
+      .set({ ...payment, settledAt: new Date() })
       .where(and(eq(orders.id, id), isNull(orders.settledAt)))
       .returning();
     if (settled) return settled;
 
-    // A concurrent poll settled it first; keep that timestamp.
-    const [order] = await getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
+    // A concurrent poll settled it first; keep that timestamp but still record the payment.
+    const [order] = payment
+      ? await getDb().update(orders).set(payment).where(eq(orders.id, id)).returning()
+      : await getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
     if (!order) throw new Error(`Cannot settle missing order ${id}.`);
     return order;
   },

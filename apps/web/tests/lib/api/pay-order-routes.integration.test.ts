@@ -111,6 +111,8 @@ test("relays the stored order with the session wallet as payer, then marks it se
   });
   const [stored] = await getDb().select().from(orders).where(eq(orders.id, order.id));
   expect(stored?.settledAt).toBeInstanceOf(Date);
+  expect(stored?.payerAddress).toBe(payer);
+  expect(stored?.txHash).toBe(hash);
 });
 
 test("requires a session", async () => {

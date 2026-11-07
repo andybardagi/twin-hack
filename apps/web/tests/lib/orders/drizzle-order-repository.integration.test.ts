@@ -106,6 +106,27 @@ test("writes settled_at once, even under concurrent settles", async () => {
   expect(again).toEqual({ ...order, settledAt: first.settledAt });
 });
 
+test("records the payment even when a poll settled the order first", async () => {
+  const merchantId = await createMerchant();
+  const order = await createSignedOrder(merchantId);
+  const polled = await drizzleOrderRepository.markSettled(order.id);
+
+  const payment = { payerAddress: `0x${"bb".repeat(20)}`, txHash: `0x${"cd".repeat(32)}` };
+  const paid = await drizzleOrderRepository.markSettled(order.id, payment);
+  expect(paid).toEqual({ ...order, ...payment, settledAt: polled.settledAt });
+});
+
+test("lists only the merchant's signed orders, newest first", async () => {
+  const merchantId = await createMerchant();
+  const older = await createSignedOrder(merchantId);
+  const newer = await createSignedOrder(merchantId);
+  await drizzleOrderRepository.create(reservationInput(merchantId));
+  await createSignedOrder(await createMerchant());
+
+  const listed = await drizzleOrderRepository.listByMerchant(merchantId);
+  expect(listed.map((order) => order.id)).toEqual([newer.id, older.id]);
+});
+
 test("returns null for an unknown order UUID", async () => {
   expect(await drizzleOrderRepository.findById(v7())).toBeNull();
 });
