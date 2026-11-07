@@ -9,7 +9,6 @@ export default defineConfig({
       DATABASE_URL: process.env.DATABASE_URL ?? "postgresql://app:password@localhost:5433/app",
       BETTER_AUTH_URL: "http://localhost:3000",
       BETTER_AUTH_SECRET: "test-only-better-auth-secret-at-least-32-characters",
-      ARBITRUM_RPC_URL: "http://127.0.0.1:1",
     },
   },
 });

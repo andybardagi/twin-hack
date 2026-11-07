@@ -13,9 +13,8 @@ Contract calls and wallet views are deferred to a later PR. Feature 003 remains 
   The plugin's required user fields remain in the schema; there is no user-facing email flow.
 - Better-auth mounts directly at `app/api/auth/[...all]/route.ts`. Auth and database setup are lazy so builds need no env.
 - Arbitrum only (42161) in every sign-in message; no network switch for login. viem verifies regular wallets locally.
-  Whenever local verification fails, including invalid regular-wallet signatures, `ARBITRUM_RPC_URL` is consulted
-  to support ERC-1271/6492 smart wallets. Unauthenticated requests can trigger this fallback. Valid regular-wallet
-  logins need no RPC.
+  Only regular wallets are supported; smart wallets such as Safe cannot sign in. Malformed and contract-style
+  signatures return 401.
 - wagmi 3 discovers EIP-6963 wallets. `/sign-in` shows one button per wallet, or a no-wallet install hint.
   No dialog, WalletConnect, RainbowKit, or ConnectKit.
 - `/` checks the session server-side with next/headers and redirects to `/sign-in` when logged out. No proxy.

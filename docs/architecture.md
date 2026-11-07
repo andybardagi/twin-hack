@@ -72,9 +72,8 @@ ID generator uses `uuid`'s `v7()` for all auth records.
   remains undecided (feature 003 is pending); authentication does not select Elysia or add product endpoints.
 - `lib/db/schema.ts` defines better-auth's user, session, account, verification, and wallet_address tables. Sessions
   retain the better-auth default lifetime. SIWE requests use Arbitrum's chain ID (42161). EOA signatures verify locally
-  with viem; whenever local verification fails, including invalid regular-wallet signatures, `ARBITRUM_RPC_URL`
-  is consulted to support ERC-1271/6492 smart wallets. Unauthenticated requests can trigger this fallback. Valid
-  regular-wallet logins need no RPC. No ENS lookup.
+  with viem. Only regular wallets are supported; smart wallets such as Safe cannot sign in. Malformed and
+  contract-style signatures are rejected as unauthorized. No ENS lookup.
 - `lib/auth-client.ts` holds the SIWE-enabled client. `lib/wagmi.ts` configures wagmi 3 for EIP-6963 wallet discovery;
   `components/auth/` contains wallet sign-in, its provider, and sign out. No WalletConnect, wallet dialog, or network
   switch is needed for login. TanStack Query mutations handle pending/error states and navigation after success.

@@ -4,7 +4,7 @@ import { generateRandomString } from "better-auth/crypto";
 import { nextCookies } from "better-auth/next-js";
 import { siwe } from "better-auth/plugins";
 import { v7 } from "uuid";
-import { createPublicClient, http, isAddress, isHex, verifyMessage } from "viem";
+import { isAddress, isHex, verifyMessage } from "viem";
 import { arbitrum } from "viem/chains";
 import { z } from "zod";
 
@@ -13,7 +13,6 @@ import { getDb } from "@/lib/db/client";
 const environmentSchema = z.object({
   BETTER_AUTH_URL: z.url(),
   BETTER_AUTH_SECRET: z.string().min(32),
-  ARBITRUM_RPC_URL: z.url(),
 });
 
 type AuthOptions = BetterAuthOptions & {
@@ -23,10 +22,6 @@ type AuthInstance = Auth<AuthOptions>;
 
 function createAuth(): AuthInstance {
   const environment = environmentSchema.parse(process.env);
-  const publicClient = createPublicClient({
-    chain: arbitrum,
-    transport: http(environment.ARBITRUM_RPC_URL, { retryCount: 0 }),
-  });
 
   return betterAuth<AuthOptions>({
     baseURL: environment.BETTER_AUTH_URL,
@@ -48,15 +43,9 @@ function createAuth(): AuthInstance {
           };
 
           try {
-            if (await verifyMessage(parameters)) return true;
+            return await verifyMessage(parameters);
           } catch {
-            // Non-EOA signatures throw here; try smart wallet verification over RPC.
-          }
-
-          try {
-            return await publicClient.verifyMessage(parameters);
-          } catch (error) {
-            console.error("SIWE RPC signature verification failed", error);
+            // viem throws for malformed or contract-style signatures; reject sign-in.
             return false;
           }
         },

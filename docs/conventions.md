@@ -79,9 +79,6 @@ Server-only environment variables (never use `NEXT_PUBLIC_`):
 - `BETTER_AUTH_SECRET`: at least 32 random characters; generate a local value with `openssl rand -base64 32`.
 - `BETTER_AUTH_URL`: the app's public origin, locally `http://localhost:3000`. Its host (including port) must match
   the domain users sign in on, because SIWE verifies that domain. Use the same host in the browser and config.
-- `ARBITRUM_RPC_URL`: an Arbitrum One RPC URL, consulted whenever local signature verification fails, including
-  invalid regular-wallet signatures, to support ERC-1271/6492 smart wallets. Unauthenticated requests can trigger
-  this fallback. Valid regular-wallet logins verify locally and need no RPC connection.
 - `DATABASE_URL`: the Postgres connection URL documented above.
 
 Start Postgres, wait for its healthcheck, and apply migrations using the commands above. Export the variables in
@@ -90,18 +87,18 @@ the shell that starts Next.js, or put them in untracked `apps/web/.env.local` (n
 ```sh
 export BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
 export BETTER_AUTH_URL='http://localhost:3000'
-export ARBITRUM_RPC_URL='https://arb1.arbitrum.io/rpc'
 pnpm dev
 ```
 
 Open `http://localhost:3000/sign-in` with an EIP-6963 browser wallet enabled. Choose the detected wallet, connect,
 and sign the message. The message always uses Arbitrum (42161); login does not switch the wallet's network or send
 transactions. With no detected wallet, install or enable one and reload. No email, ENS, or WalletConnect is used.
+Only regular wallets are supported; smart wallets such as Safe cannot sign in. Signatures verify locally with viem.
 The home page shows the session user's primary wallet address. Sign out returns to `/sign-in`; visiting `/` without
 a session redirects there. Both themes use the shared neutral design tokens.
 
 `pnpm test` runs integration tests against Postgres plus client action tests. Test auth settings are supplied by
-Vitest; the RPC fallback tests use a local stub server. `pnpm build` requires none of these environment variables.
+Vitest. `pnpm build` requires none of these environment variables.
 
 ## Components (shadcn / Base UI pattern)
 

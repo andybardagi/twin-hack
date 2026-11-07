@@ -82,7 +82,7 @@
         "suggestions": ""
       },
       {
-        "description": "Regular wallet signatures verify locally; only failed local verification falls back to Arbitrum RPC for smart wallets.",
+        "description": "Regular wallet signatures verify locally with viem; smart wallets such as Safe cannot sign in.",
         "status": "approved",
         "suggestions": ""
       },

@@ -51,7 +51,7 @@ afterEach(async () => {
   nonceIdentifiers.length = 0;
 });
 
-test("EOA sign-in creates a session and Arbitrum wallet without an RPC connection", async () => {
+test("EOA sign-in creates a session and Arbitrum wallet", async () => {
   const { wallet, message, signature } = await signedAttempt();
   const response = await request("/siwe/verify", { message, signature });
   expect(response.status).toBe(200);
@@ -118,7 +118,7 @@ test("a signature for another chain is rejected", async () => {
   expect((await request("/siwe/verify", { message, signature })).status).toBe(401);
 });
 
-test("a signature from another wallet is rejected even when RPC is unavailable", async () => {
+test("a signature from another wallet is rejected", async () => {
   const { message } = await signedAttempt();
   const otherWallet = privateKeyToAccount(generatePrivateKey());
   const signature = await otherWallet.signMessage({ message });
@@ -127,14 +127,17 @@ test("a signature from another wallet is rejected even when RPC is unavailable",
   expect(await response.json()).toMatchObject({ message: "Unauthorized: Invalid SIWE signature" });
 });
 
-test.each(["not-hex", "0x12", `0x${"00".repeat(65)}`, `0x${"00".repeat(64)}1b`])(
-  "malformed signature %s fails sign-in",
-  async (signature) => {
-    const { message } = await signedAttempt();
-    const response = await request("/siwe/verify", { message, signature });
-    expect(response.status).toBe(401);
-    expect(await response.json()).toMatchObject({
-      message: "Unauthorized: Invalid SIWE signature",
-    });
-  },
-);
+test.each([
+  "not-hex",
+  "0x12",
+  `0x${"00".repeat(65)}`,
+  `0x${"00".repeat(64)}1b`,
+  `0x${"ab".repeat(66)}`,
+])("malformed signature %s fails sign-in", async (signature) => {
+  const { message } = await signedAttempt();
+  const response = await request("/siwe/verify", { message, signature });
+  expect(response.status).toBe(401);
+  expect(await response.json()).toMatchObject({
+    message: "Unauthorized: Invalid SIWE signature",
+  });
+});
