@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { assertNever } from "@workspace/payments/assert-never";
 
 import { OrderAmount } from "@/components/orders/order-amount";
@@ -6,9 +8,12 @@ import type { PayOrder } from "@/lib/orders/pay-order";
 export function PayOrderStatus({
   order,
   retryHref,
+  payment,
 }: {
   order: Exclude<PayOrder, { status: "not-found" }>;
   retryHref: string;
+  /** Rendered under a valid order: how the customer pays it. */
+  payment?: ReactNode;
 }) {
   switch (order.status) {
     case "valid":
@@ -18,6 +23,7 @@ export function PayOrderStatus({
           <p className="text-sm text-muted-foreground">
             Verified: signed by the merchant’s registered device.
           </p>
+          {payment}
         </>
       );
     case "paid":

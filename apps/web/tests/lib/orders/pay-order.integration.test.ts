@@ -8,7 +8,7 @@ import { arbitrum } from "viem/chains";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { tokens } from "@workspace/payments/tokens";
-import { signOrder } from "@workspace/payments/typed-data";
+import { hashOrder, signOrder } from "@workspace/payments/typed-data";
 
 import { PayOrderStatus } from "@/components/orders/pay-order-status";
 import type { RouterReader } from "@/lib/chain/router-reader";
@@ -86,9 +86,17 @@ const display = { amount: "123.45", token: "USDT" };
 
 test("a signature from the merchant's on-chain key is valid", async () => {
   const order = await createSignedOrder();
+  const signed = toSignableOrder(toReservedOrder(order));
   expect(await verifyPayOrder(order.id, drizzleOrderRepository, chain())).toEqual({
     status: "valid",
     display,
+    payment: {
+      router: routerAddress,
+      orderHash: hashOrder({ chainId: arbitrum.id, router: routerAddress }, signed),
+      receiveToken: tokens.USDT0.address,
+      receiveAmount: "123450000",
+      expiry: Number(signed.expiry),
+    },
   });
 });
 
