@@ -8,6 +8,10 @@ Chain: Arbitrum One (chain ID 42161)
 
 PaymentRouter: [`0x4DE32c75eecDF3229114F105293698284b261Bb1`](https://arbiscan.io/address/0x4DE32c75eecDF3229114F105293698284b261Bb1)
 
+Relayer (submits every `pay`, pays the gas): [`0x0d19E01d79BD44d6829555dd868eD901Ab69588A`](https://arbiscan.io/address/0x0d19E01d79BD44d6829555dd868eD901Ab69588A)
+
+App: [twin-hack.vercel.app](https://twin-hack.vercel.app)
+
 Demo transactions: <TBD>
 
 | Token | Address | Curve Twocrypto pool (Twin / USDT0) |
