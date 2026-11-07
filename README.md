@@ -31,3 +31,30 @@ forge script script/Deploy.s.sol --rpc-url $ARBITRUM_RPC_URL --broadcast --verif
 ```
 
 `--verify` is optional and needs an Etherscan v2 API key in `ETHERSCAN_API_KEY`.
+
+## Running the app
+
+Needs Node 20+, pnpm, Postgres (`docker compose up -d`, host port 5433), and [Foundry](https://getfoundry.sh) for the contracts and chain tests. From the repo root:
+
+```sh
+git submodule update --init --recursive   # contracts/lib: forge-std, openzeppelin-contracts
+pnpm install
+export DATABASE_URL='postgresql://app:password@localhost:5433/app'
+pnpm --filter web db:migrate
+export BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
+export BETTER_AUTH_URL='http://localhost:3000'
+export PAYMENT_ROUTER_ADDRESS=0x...   # PaymentRouter to read; not deployed to Arbitrum yet
+export ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
+pnpm dev
+```
+
+`NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is optional and adds WalletConnect. Without `PAYMENT_ROUTER_ADDRESS` and `ARBITRUM_RPC_URL`, the app runs but signing key, forward address, and order creation show as not available. `pnpm build` needs none of these variables.
+
+`pnpm test` runs the web tests against Postgres. The chain tests fork Arbitrum with Anvil, deploy `PaymentRouter` from the Forge artifact, and also need Postgres:
+
+```sh
+(cd contracts && forge build)             # writes contracts/out/PaymentRouter.sol/PaymentRouter.json
+pnpm --filter web test:chain              # forks ARBITRUM_RPC_URL, default https://arb1.arbitrum.io/rpc
+```
+
+Details live in [docs/conventions.md](./docs/conventions.md).

@@ -21,7 +21,9 @@
 
 A change is not finished until `pnpm lint && pnpm typecheck && pnpm build` passes from the repo root.
 
-**Testing:** Vitest is configured in `apps/web`. Run `pnpm test` from the root (or `pnpm --filter web test`). Tests live under `apps/web/tests/` mirroring source (see `docs/architecture.md`). Integration tests require real Postgres with migrations applied; the default test URL is the local Docker URL below. Export `DATABASE_URL` to use a dedicated test database. Tests create and clean up their own auth records.
+**Testing:** Vitest is configured in `apps/web`. Run `pnpm test` from the root (or `pnpm --filter web test`). Tests live under `apps/web/tests/` mirroring source (see `docs/architecture.md`). Integration tests require real Postgres with migrations applied; the default test URL is the local Docker URL below. Export `DATABASE_URL` to use a dedicated test database. Tests create and clean up their own records.
+Chain tests under `apps/web/tests/chain/` are excluded from `pnpm test`; run them with `pnpm --filter web test:chain`
+(see "Chain tests locally" below).
 
 **Unused code:** `pnpm knip` must stay clean. Configure `knip.json` before ignoring issues; never use broad `ignore` patterns.
 
@@ -99,6 +101,37 @@ a session redirects there. Both themes use the shared neutral design tokens.
 
 `pnpm test` runs integration tests against Postgres plus client action tests. Test auth settings are supplied by
 Vitest. `pnpm build` requires none of these environment variables.
+
+Optional:
+
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (public, client-side): adds WalletConnect for mobile wallets when set.
+
+## Orders locally
+
+Settings and orders read `PaymentRouter` on Arbitrum. Both variables are server-only and read at runtime:
+
+- `PAYMENT_ROUTER_ADDRESS`: the deployed `PaymentRouter` address. Invalid or zero addresses throw.
+- `ARBITRUM_RPC_URL`: an HTTP(S) Arbitrum One RPC URL.
+
+With either missing, `/settings` hides the signing key and forward address and `/orders/new` says creating orders
+is not available yet; the pay page asks to try again. `PaymentRouter` is not deployed to Arbitrum yet, so point
+these at an Anvil fork with a locally deployed router to try the flow. The QR links to
+`$BETTER_AUTH_URL/pay/order/<id>`.
+
+## Chain tests locally
+
+Chain tests need Foundry (`anvil`, and `forge` if the `PaymentRouter` artifact is missing), the contracts
+submodules, Postgres with migrations applied, and network access to an Arbitrum RPC:
+
+```sh
+git submodule update --init --recursive
+(cd contracts && forge build)
+pnpm --filter web test:chain
+```
+
+The suite starts Anvil on a fork of `ARBITRUM_RPC_URL` (default `https://arb1.arbitrum.io/rpc`; `FORK_BLOCK` pins
+a block), deploys `PaymentRouter` from `contracts/out/PaymentRouter.sol/PaymentRouter.json`, and builds it with
+`forge build` when that file is missing. It never sends transactions outside the local fork.
 
 ## Components (shadcn / Base UI pattern)
 

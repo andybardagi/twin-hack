@@ -24,7 +24,7 @@ No username or password. Merchants and customers sign in with their EVM wallet b
 - Registers a signing key once. The app generates the key on the merchant's device, and the merchant's wallet registers it in the payment contract with an on-chain transaction. The merchant can rotate or revoke it the same way.
 - Picks the token they want to receive (ARGt, BRAt, USDT0, ...).
 - Optionally sets a forward address. Payments then settle directly to that address instead of the merchant's wallet. The forward address is stored in the payment contract. The merchant sets the forwarding address on-chain.
-- Creates an order with an amount in the receive token. The signing key signs the order, with no wallet prompt, and the signed order becomes the QR.
+- Creates an order with an amount in the receive token. The signing key signs the order, with no wallet prompt. The server stores the signed order, and the QR is a short link to `/pay/order/<id>`.
 - Gets a real-time confirmation when the payment settles.
 
 The signing key never leaves the merchant's device, so our backend can't forge an order or change where it pays out.
@@ -32,14 +32,16 @@ The signing key never leaves the merchant's device, so our backend can't forge a
 ## Customer
 
 - Signs in with their wallet.
-- Scans the QR. The app checks that the order was signed by the merchant's registered signing key and rejects it otherwise. Then it shows what the merchant is asking for (e.g. 15,000 ARGt).
+- Scans the QR. The server checks that the stored order was signed by the merchant's registered signing key (read on-chain) and rejects it otherwise. Then the app shows what the merchant is asking for (e.g. 15,000 ARGt). The contract still enforces the signer when the order is paid.
 - Picks which of their stablecoins to pay with. The app shows a live quote for each one: amount to pay, fee, and route.
 - Signs the payment. No gas, no ETH needed. The first payment with a Twin token asks for one extra approval transaction, and we fund its gas (see [Gasless](#gasless)).
 - Gets a confirmation.
 
 ## Payment intent
 
-The QR carries the order, signed by the merchant's key with EIP-712: `merchant`, `receiveToken`, `receiveAmount`, `orderId`, `expiry`. `chainId` and the contract address live in the EIP-712 domain, so a signature from another chain or contract is rejected.
+The order is signed by the merchant's key with EIP-712: `merchant`, `receiveToken`, `receiveAmount`, `orderId`, `expiry`, `feeBps`. `chainId` and the contract address live in the EIP-712 domain, so a signature from another chain or contract is rejected. `feeBps` is in the order so the merchant signs the fee they pay; if our fee changes, unpaid orders signed at the old fee stop working.
+
+The server stores the signed order, including the merchant signature. The QR is a short link to `/pay/order/<id>`, which loads it from the server.
 
 When the customer scans it, the app adds the customer's side: `payToken`, `maxPayAmount` (the quote plus slippage), and the order hash, so the customer signs that exact order.
 
