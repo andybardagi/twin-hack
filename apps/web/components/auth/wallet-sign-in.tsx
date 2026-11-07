@@ -9,10 +9,14 @@ import { getSignInMessage, signInWallet } from "@/components/auth/sign-in-wallet
 
 function WalletSignIn() {
   const config = useConfig();
-  const connectors = useConnectors();
+  const availableConnectors = useConnectors();
+  const [hydrated, setHydrated] = useState(false);
   const [discoveryReady, setDiscoveryReady] = useState(false);
+  // The server has no WalletConnect connector, so match its empty list until hydrated.
+  const connectors = hydrated ? availableConnectors : [];
 
   useEffect(() => {
+    setHydrated(true);
     // EIP-6963 announcements can arrive after hydration; keep listening for late wallets.
     const timer = window.setTimeout(() => setDiscoveryReady(true), 500);
     return () => window.clearTimeout(timer);
