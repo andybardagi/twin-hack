@@ -19,8 +19,8 @@ import { paymentRouterAbi } from "../src/abi";
 import { approveTwin, twinApprovalStatus } from "../src/approval";
 import { assertNever } from "../src/assert-never";
 import { paymentRouterAddress as router } from "../src/deployment";
-import { submitPayment } from "../src/pay";
 import { quote } from "../src/quote";
+import { relayPayment } from "../src/relay";
 import { isTokenSymbol, tokens, type TokenSymbol } from "../src/tokens";
 import { hashOrder, noPermit, signIntent, signOrder, signUsdt0Permit } from "../src/typed-data";
 
@@ -149,7 +149,7 @@ const intent = {
   maxPayAmount: quoted.maxPayAmount,
   orderHash: hashOrder(domain, order),
 };
-const { hash, settled } = await submitPayment(relayer, publicClient, {
+const relayed = await relayPayment(relayer, publicClient, {
   router,
   order,
   merchantSignature: await signOrder(merchantSigner, domain, order),
@@ -157,6 +157,17 @@ const { hash, settled } = await submitPayment(relayer, publicClient, {
   payerSignature: await signIntent(customer, domain, intent),
   permit,
 });
+switch (relayed.kind) {
+  case "settled":
+    break;
+  case "invalid-order":
+    throw new Error(`Order rejected before relaying: ${relayed.reason}`);
+  case "reverted":
+    throw new Error(`pay would revert with ${relayed.errorName}; nothing was sent`);
+  default:
+    assertNever(relayed);
+}
+const { hash, settled } = relayed;
 
 const payDecimals = tokens[payToken].decimals;
 const receiveDecimals = tokens[receiveToken].decimals;

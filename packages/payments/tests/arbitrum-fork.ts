@@ -85,7 +85,7 @@ async function waitForRpc(publicClient: PublicClient, anvil: ChildProcess, stder
 }
 
 export type ArbitrumFork = {
-  publicClient: PublicClient;
+  publicClient: PublicClient<Transport, Chain>;
   testClient: TestClient<"anvil", Transport, Chain>;
   walletFor: (account: PrivateKeyAccount) => WalletClient<Transport, Chain, PrivateKeyAccount>;
   router: Address;

@@ -3,7 +3,7 @@ import { arbitrum } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { paymentRouterAbi } from "../src/abi";
-import { submitPayment } from "../src/pay";
+import { relayPayment } from "../src/relay";
 import { tokens } from "../src/tokens";
 import { hashOrder, signIntent, signOrder, type Order, type RouterDomain } from "../src/typed-data";
 import { verifyOrder } from "../src/verify-order";
@@ -122,13 +122,14 @@ describe("verifyOrder on an Arbitrum fork", () => {
       maxPayAmount: RECEIVE_AMOUNT,
       orderHash: hashOrder(domain, order),
     };
-    await submitPayment(fork.walletFor(owner), fork.publicClient, {
+    const relayed = await relayPayment(fork.walletFor(owner), fork.publicClient, {
       router: fork.router,
       order,
       merchantSignature,
       intent,
       payerSignature: await signIntent(fork.walletFor(customer), domain, intent),
     });
+    expect(relayed.kind).toBe("settled");
 
     expect(await verify(order, merchantSignature)).toEqual({
       kind: "invalid",

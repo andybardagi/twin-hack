@@ -3,14 +3,16 @@ import {
   recoverAddress,
   zeroAddress,
   type Address,
+  type Chain,
   type Hex,
   type PublicClient,
+  type Transport,
 } from "viem";
 
 import { paymentRouterAbi } from "./abi";
 import { hashOrder, type Order, type RouterDomain } from "./typed-data";
 
-type InvalidOrderReason =
+export type InvalidOrderReason =
   | "no-signing-key"
   | "wrong-signer"
   | "fee-changed"
@@ -37,7 +39,7 @@ async function recoverOrderSigner(domain: RouterDomain, order: Order, signature:
  * token) so it matches the revert `pay` would hit; self-payment comes last. `publicClient` needs a chain with multicall3.
  */
 export async function verifyOrder(
-  publicClient: PublicClient,
+  publicClient: PublicClient<Transport, Chain>,
   {
     router,
     order,
@@ -45,8 +47,6 @@ export async function verifyOrder(
     payer,
   }: { router: Address; order: Order; merchantSignature: Hex; payer: Address },
 ): Promise<OrderVerification> {
-  const { chain } = publicClient;
-  if (!chain) throw new Error("verifyOrder needs a publicClient configured with a chain");
   const routerContract = { address: router, abi: paymentRouterAbi } as const;
   const [[signingKey, feeBps, paid, payout, usdt0, receivePool], { timestamp }] = await Promise.all(
     [
@@ -67,7 +67,11 @@ export async function verifyOrder(
   const invalid = (reason: InvalidOrderReason): OrderVerification => ({ kind: "invalid", reason });
 
   if (isAddressEqual(signingKey, zeroAddress)) return invalid("no-signing-key");
-  const signer = await recoverOrderSigner({ chainId: chain.id, router }, order, merchantSignature);
+  const signer = await recoverOrderSigner(
+    { chainId: publicClient.chain.id, router },
+    order,
+    merchantSignature,
+  );
   if (!signer || !isAddressEqual(signer, signingKey)) return invalid("wrong-signer");
   if (order.feeBps !== feeBps) return invalid("fee-changed");
   if (timestamp > order.expiry) return invalid("expired");

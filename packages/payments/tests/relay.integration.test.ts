@@ -1,17 +1,28 @@
-import { erc20Abi, keccak256, maxUint256, parseUnits, toHex, type Address } from "viem";
+import {
+  createPublicClient,
+  custom,
+  erc20Abi,
+  keccak256,
+  maxUint256,
+  parseUnits,
+  toHex,
+  type Address,
+} from "viem";
 import { arbitrum } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { paymentRouterAbi } from "../src/abi";
 import { assertNever } from "../src/assert-never";
-import { submitPayment } from "../src/pay";
 import { quote } from "../src/quote";
+import { relayPayment, type RelayPaymentArgs } from "../src/relay";
 import { tokens, type TokenSymbol } from "../src/tokens";
 import {
   hashOrder,
   signIntent,
   signOrder,
   signUsdt0Permit,
+  type Intent,
+  type Order,
   type RouterDomain,
 } from "../src/typed-data";
 import {
@@ -29,7 +40,7 @@ const RECEIVE_AMOUNT = parseUnits("15000", tokens.ARGt.decimals);
 
 type Authorization = "permit" | "approve";
 
-describe("PaymentRouter SDK on an Arbitrum fork", () => {
+describe("relayPayment on an Arbitrum fork", () => {
   let fork: ArbitrumFork;
   let domain: RouterDomain;
 
@@ -128,7 +139,7 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
     const payerBefore = await balanceOf(payTokenAddress, customer.address);
     const merchantBefore = await balanceOf(receiveToken, merchant.address);
 
-    const { settled } = await submitPayment(fork.walletFor(owner), fork.publicClient, {
+    const relayed = await relayPayment(fork.walletFor(owner), fork.publicClient, {
       router: domain.router,
       order,
       merchantSignature: await signOrder(fork.walletFor(merchantSigner), domain, order),
@@ -136,6 +147,8 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
       payerSignature: await signIntent(fork.walletFor(customer), domain, intent),
       permit,
     });
+    if (relayed.kind !== "settled") throw new Error(`Expected settled, got ${relayed.kind}`);
+    const { settled } = relayed;
 
     const fee = (RECEIVE_AMOUNT * BigInt(FEE_BPS)) / 10_000n;
     expect(settled.fee).toBe(fee);
@@ -165,5 +178,96 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
   it("settles BRAt -> ARGt in two hops after a one-time approve", async () => {
     const quoted = await payAndAssert("BRAt", "brat-to-argt", "approve");
     expect(quoted.route.kind).toBe("double");
+  });
+
+  async function relayWithoutSending(args: RelayPaymentArgs) {
+    const relayerNonce = () => fork.publicClient.getTransactionCount({ address: owner.address });
+    const nonceBefore = await relayerNonce();
+    const relayed = await relayPayment(fork.walletFor(owner), fork.publicClient, args);
+    expect(await relayerNonce()).toBe(nonceBefore);
+    return relayed;
+  }
+
+  async function signedPayment(
+    label: string,
+    { expiry, payer = customer.address }: { expiry?: bigint; payer?: Address } = {},
+  ): Promise<RelayPaymentArgs> {
+    const { timestamp } = await fork.publicClient.getBlock();
+    const order: Order = {
+      merchant: merchant.address,
+      receiveToken: tokens.USDT0.address,
+      receiveAmount: parseUnits("1", tokens.USDT0.decimals),
+      orderId: keccak256(toHex(label)),
+      expiry: expiry ?? timestamp + ORDER_TTL_SECONDS,
+      feeBps: FEE_BPS,
+    };
+    const intent: Intent = {
+      payer,
+      payToken: tokens.USDT0.address,
+      maxPayAmount: order.receiveAmount,
+      orderHash: hashOrder(domain, order),
+    };
+    return {
+      router: domain.router,
+      order,
+      merchantSignature: await signOrder(fork.walletFor(merchantSigner), domain, order),
+      intent,
+      payerSignature: await signIntent(fork.walletFor(customer), domain, intent),
+    };
+  }
+
+  it("rejects a self-payment without sending a tx", async () => {
+    const args = await signedPayment("self-payment", { payer: merchant.address });
+    expect(await relayWithoutSending(args)).toEqual({
+      kind: "invalid-order",
+      reason: "self-payment",
+    });
+  });
+
+  it("rejects an expired order without sending a tx", async () => {
+    const { timestamp } = await fork.publicClient.getBlock();
+    const args = await signedPayment("expired", { expiry: timestamp - 1n });
+    expect(await relayWithoutSending(args)).toEqual({ kind: "invalid-order", reason: "expired" });
+  });
+
+  it("surfaces the router's revert error without sending a tx", async () => {
+    const args = await signedPayment("bad-payer-signature");
+    const forged = await signIntent(fork.walletFor(owner), domain, args.intent);
+    expect(await relayWithoutSending({ ...args, payerSignature: forged })).toEqual({
+      kind: "reverted",
+      errorName: "InvalidPayerSignature",
+    });
+  });
+
+  it("rethrows an RPC internal error during simulation instead of reporting a revert", async () => {
+    const args = await signedPayment("rpc-internal-error");
+    // Fails only the simulated `pay` (an eth_call to the router); verifyOrder's multicall still reaches anvil.
+    const flakyClient = createPublicClient({
+      chain: arbitrum,
+      transport: custom(
+        {
+          request: async (request: { method: string; params?: unknown }) => {
+            const call: unknown = Array.isArray(request.params) ? request.params[0] : undefined;
+            const toRouter =
+              typeof call === "object" &&
+              call !== null &&
+              "to" in call &&
+              typeof call.to === "string" &&
+              call.to.toLowerCase() === domain.router.toLowerCase();
+            if (request.method === "eth_call" && toRouter)
+              throw Object.assign(new Error("header not found"), { code: -32603 });
+            return fork.publicClient.transport.request(request);
+          },
+        },
+        { retryCount: 0 },
+      ),
+    });
+    const nonceBefore = await fork.publicClient.getTransactionCount({ address: owner.address });
+    await expect(relayPayment(fork.walletFor(owner), flakyClient, args)).rejects.toThrow(
+      "header not found",
+    );
+    expect(await fork.publicClient.getTransactionCount({ address: owner.address })).toBe(
+      nonceBefore,
+    );
   });
 });
