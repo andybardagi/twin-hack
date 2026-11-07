@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 
 import {
@@ -45,7 +46,10 @@ function HowItWorks({ locale }: { locale: Locale }) {
     <div lang={locale} className="min-h-svh bg-background text-foreground">
       <div className="mx-auto max-w-300 px-6 sm:px-8">
         <header className="flex flex-wrap items-center justify-between gap-2 py-4">
-          <p className="text-sm font-medium">Ponte</p>
+          <div className="flex items-center gap-2">
+            <Image src="/icon-192.png" alt="" width={24} height={24} className="rounded-md" />
+            <p className="text-sm font-medium">Ponte</p>
+          </div>
           <LanguageSwitcher locale={locale} label={text.languageLabel} />
         </header>
         <main>
