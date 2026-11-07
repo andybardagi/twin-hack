@@ -25,7 +25,8 @@
       "postcss": {
         "config": "postcss.config.mjs"
       },
-      "ignoreDependencies": ["@tanstack/react-form", "@walletconnect/ethereum-provider"]
+      "ignoreDependencies": ["@walletconnect/ethereum-provider"],
+      "ignoreBinaries": ["anvil", "forge"]
     },
     "apps/storybook": {
       "entry": ["stories/**/*.stories.tsx"],

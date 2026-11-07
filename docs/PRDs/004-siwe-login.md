@@ -3,7 +3,7 @@
 ## Status: done
 
 Provide wallet login for `apps/web`: connect, sign, create a session, visit one protected page, and sign out.
-Contract calls and wallet views are deferred to a later PR. Feature 003 remains pending; no Elysia is introduced.
+Contract calls and wallet views are deferred to a later PR. This feature mounts better-auth directly and adds no product endpoints; feature 003 was decided later, in feature 005 (Elysia).
 
 ## Decisions
 

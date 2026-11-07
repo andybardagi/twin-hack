@@ -1,4 +1,13 @@
-import { boolean, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id").primaryKey(),
@@ -11,6 +20,32 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => new Date())
     .notNull(),
+});
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey(),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    tokenAddress: text("token_address").notNull(),
+    amount: numeric("amount", { precision: 78, scale: 0 }).notNull(),
+    merchantAddress: text("merchant_address").notNull(),
+    expiresAt: timestamp("expires_at", { precision: 0 }).notNull(),
+    feeBps: integer("fee_bps").notNull(),
+    signature: text("signature"),
+    settledAt: timestamp("settled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("orders_merchant_id_idx").on(table.merchantId)],
+);
+
+export const merchantSettings = pgTable("merchant_settings", {
+  merchantId: uuid("merchant_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  defaultTokenAddress: text("default_token_address").notNull(),
 });
 
 export const session = pgTable(

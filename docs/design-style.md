@@ -53,5 +53,7 @@ Do not introduce a competing brand hue (lime, teal, orange, pink, purple) in com
 
 - Do not warm the neutral palette into cream, sand, tan, or brown unless the product later replaces this theme.
 - Do not use raw hex, RGB, HSL, or OKLCH literals in component code when a semantic token exists.
+  Exception: the order QR (`apps/web/components/orders/order-qr-code.tsx`) is fixed black on white in both themes so
+  scanners always get full contrast.
 - Do not invent a parallel palette next to the tokens in `globals.css`.
 - Both light and dark mode must keep working.
