@@ -12,12 +12,13 @@ import {
 import { paymentRouterAbi } from "@workspace/payments/abi";
 import { assertNever } from "@workspace/payments/assert-never";
 
-export async function setSigningKey(
+async function writeRouterAddress(
   config: Config,
   connector: Connector,
   merchant: Address,
   router: Address,
-  signingKey: Address,
+  functionName: "setSigningKey" | "setPayoutAddress",
+  value: Address,
 ): Promise<void> {
   const connection = getConnection(config);
   const accounts =
@@ -34,8 +35,8 @@ export async function setSigningKey(
     chainId: arbitrum.id,
     address: router,
     abi: paymentRouterAbi,
-    functionName: "setSigningKey",
-    args: [signingKey],
+    functionName,
+    args: [value],
   });
   const receipt = await waitForTransactionReceipt(config, { chainId: arbitrum.id, hash });
   switch (receipt.status) {
@@ -48,7 +49,27 @@ export async function setSigningKey(
   }
 }
 
-export function signingKeyErrorMessage(error: unknown): string {
+export function setSigningKey(
+  config: Config,
+  connector: Connector,
+  merchant: Address,
+  router: Address,
+  signingKey: Address,
+): Promise<void> {
+  return writeRouterAddress(config, connector, merchant, router, "setSigningKey", signingKey);
+}
+
+export function setPayoutAddress(
+  config: Config,
+  connector: Connector,
+  merchant: Address,
+  router: Address,
+  payoutAddress: Address,
+): Promise<void> {
+  return writeRouterAddress(config, connector, merchant, router, "setPayoutAddress", payoutAddress);
+}
+
+function transactionErrorMessage(error: unknown, fallback: string): string {
   const cause =
     error instanceof BaseError
       ? error.walk((cause) => cause instanceof UserRejectedRequestError)
@@ -66,5 +87,19 @@ export function signingKeyErrorMessage(error: unknown): string {
     ].includes(error.message)
   )
     return error.message;
-  return "Couldn’t update the signing key. Unlock your signed-in wallet, select Arbitrum, check your ETH balance and browser storage, then try again.";
+  return fallback;
+}
+
+export function signingKeyErrorMessage(error: unknown): string {
+  return transactionErrorMessage(
+    error,
+    "Couldn’t update the signing key. Unlock your signed-in wallet, select Arbitrum, check your ETH balance and browser storage, then try again.",
+  );
+}
+
+export function payoutAddressErrorMessage(error: unknown): string {
+  return transactionErrorMessage(
+    error,
+    "Couldn’t update the forward address. Unlock your signed-in wallet, select Arbitrum, check your ETH balance, then try again.",
+  );
 }

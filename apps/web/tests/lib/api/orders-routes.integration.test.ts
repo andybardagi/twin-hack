@@ -1,20 +1,18 @@
 import { inArray } from "drizzle-orm";
 import { Elysia } from "elysia";
 import { v7 } from "uuid";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { arbitrum } from "viem/chains";
-import { createSiweMessage } from "viem/siwe";
 import { afterEach, expect, expectTypeOf, test, vi } from "vitest";
 import { z } from "zod";
 
 import { POST, type App } from "@/app/api/[[...slugs]]/route";
-import { GET as authGET, POST as authPOST } from "@/app/api/auth/[...all]/route";
+import { GET as authGET } from "@/app/api/auth/[...all]/route";
 import { ordersRoutes } from "@/lib/api/orders-routes";
 import { getDb } from "@/lib/db/client";
 import { orders, user, verification } from "@/lib/db/schema";
 import { drizzleOrderRepository } from "@/lib/orders/drizzle-order-repository";
 import { betterAuthSessionReader } from "@/lib/session/better-auth-session-reader";
 import { tokens } from "@/src/helpers/tokens";
+import { signInMerchant } from "./sign-in-merchant";
 
 const baseURL = "http://localhost:3000";
 const addresses: string[] = [];
@@ -31,42 +29,7 @@ function orderRequest(body: unknown, cookie = ""): Request {
   });
 }
 
-async function signIn() {
-  const wallet = privateKeyToAccount(generatePrivateKey());
-  addresses.push(wallet.address);
-  const nonceResponse = await authPOST(
-    new Request(`${baseURL}/api/auth/siwe/nonce`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Origin: baseURL },
-      body: "{}",
-    }),
-  );
-  expect(nonceResponse.status).toBe(200);
-  const { nonce } = z.object({ nonce: z.string() }).parse(await nonceResponse.json());
-  nonceIdentifiers.push(`siwe:${nonce}`);
-  const message = createSiweMessage({
-    address: wallet.address,
-    chainId: arbitrum.id,
-    domain: "localhost:3000",
-    uri: baseURL,
-    version: "1",
-    nonce,
-  });
-  const response = await authPOST(
-    new Request(`${baseURL}/api/auth/siwe/verify`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Origin: baseURL },
-      body: JSON.stringify({ message, signature: await wallet.signMessage({ message }) }),
-    }),
-  );
-  expect(response.status).toBe(200);
-  const result = z.object({ user: z.object({ id: z.uuidv7() }) }).parse(await response.json());
-  const cookie = response.headers
-    .getSetCookie()
-    .map((value) => value.split(";")[0])
-    .join("; ");
-  return { merchantId: result.user.id, cookie };
-}
+const signIn = () => signInMerchant(addresses, nonceIdentifiers);
 
 afterEach(async () => {
   vi.restoreAllMocks();

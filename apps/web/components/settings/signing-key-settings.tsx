@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { zeroAddress, type Address } from "viem";
 import { arbitrum } from "viem/chains";
-import { WagmiProvider, useConfig, useConnectors, useReadContract } from "wagmi";
+import { useConfig, useConnectors, useReadContract } from "wagmi";
 
 import { paymentRouterAbi } from "@workspace/payments/abi";
 import { assertNever } from "@workspace/payments/assert-never";
@@ -18,7 +18,6 @@ import {
   prepareDeviceKey,
 } from "@/lib/signing-key/device-key";
 import { deriveKeyState } from "@/lib/signing-key/key-state";
-import { wagmiConfig } from "@/lib/wagmi";
 
 function keyStateMessage(state: ReturnType<typeof deriveKeyState>) {
   switch (state) {
@@ -35,7 +34,7 @@ function keyStateMessage(state: ReturnType<typeof deriveKeyState>) {
   }
 }
 
-function SigningKeyControls({ merchant, router }: { merchant: Address; router: Address }) {
+export function SigningKeySettings({ merchant, router }: { merchant: Address; router: Address }) {
   const config = useConfig();
   const connectors = useConnectors();
   const queryClient = useQueryClient();
@@ -171,13 +170,5 @@ function SigningKeyControls({ merchant, router }: { merchant: Address; router: A
       )}
       {mutation.isSuccess && <p role="status">Signing key updated.</p>}
     </div>
-  );
-}
-
-export function SigningKeySettings(props: { merchant: Address; router: Address }) {
-  return (
-    <WagmiProvider config={wagmiConfig}>
-      <SigningKeyControls {...props} />
-    </WagmiProvider>
   );
 }

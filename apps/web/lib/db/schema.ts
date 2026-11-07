@@ -36,6 +36,13 @@ export const orders = pgTable(
   (table) => [index("orders_merchant_id_idx").on(table.merchantId)],
 );
 
+export const merchantSettings = pgTable("merchant_settings", {
+  merchantId: uuid("merchant_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  defaultTokenAddress: text("default_token_address").notNull(),
+});
+
 export const session = pgTable(
   "session",
   {

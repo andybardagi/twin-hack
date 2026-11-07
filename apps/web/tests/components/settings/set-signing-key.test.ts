@@ -3,7 +3,11 @@ import { expect, it } from "vitest";
 import { arbitrum, mainnet } from "viem/chains";
 import { createConfig, http } from "wagmi";
 import { mock } from "wagmi/connectors";
-import { setSigningKey, signingKeyErrorMessage } from "@/components/settings/set-signing-key";
+import {
+  payoutAddressErrorMessage,
+  setSigningKey,
+  signingKeyErrorMessage,
+} from "@/components/settings/set-signing-key";
 it("gives actionable messages without exposing provider error details", () => {
   expect(
     signingKeyErrorMessage(new UserRejectedRequestError(new Error("private provider data"))),
@@ -15,6 +19,13 @@ it("gives actionable messages without exposing provider error details", () => {
   expect(
     signingKeyErrorMessage(new Error("Transaction reverted. Check your wallet and try again.")),
   ).toContain("reverted");
+});
+
+it("names the forward address in its fallback and keeps shared wallet messages", () => {
+  expect(payoutAddressErrorMessage(new Error("private provider data"))).toContain(
+    "forward address",
+  );
+  expect(payoutAddressErrorMessage({ code: 4001 })).toContain("canceled");
 });
 
 const merchant = "0x1234567890123456789012345678901234567890";

@@ -15,6 +15,13 @@
       "when": 1794066337425,
       "tag": "0001_hot_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794072299743,
+      "tag": "0002_sharp_mikhail_rasputin",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,9 @@ import { getAddress } from "viem";
 
 import { assertNever } from "@workspace/payments/assert-never";
 
+import { DefaultReceiveTokenSettings } from "@/components/settings/default-receive-token-settings";
+import { ForwardAddressSettings } from "@/components/settings/forward-address-settings";
+import { SettingsWagmiProvider } from "@/components/settings/settings-wagmi-provider";
 import { SigningKeySettings } from "@/components/settings/signing-key-settings";
 import { getAuth } from "@/lib/auth";
 import { getChainConfig } from "@/lib/chain/chain-config";
@@ -16,14 +19,34 @@ export default async function Page() {
   if (!session) redirect("/sign-in");
   const merchant = await getPrimaryWalletAddress(session.user.id);
   const config = getChainConfig();
-  function content() {
+  function chainContent() {
     if (!merchant)
       return <p role="alert">Your wallet couldn’t be found. Sign out and sign in again.</p>;
     switch (config.status) {
       case "not-configured":
-        return <p>Signing key settings are not available yet. Try again later.</p>;
+        return (
+          <p>Signing key and forward address settings are not available yet. Try again later.</p>
+        );
       case "configured":
-        return <SigningKeySettings merchant={getAddress(merchant)} router={config.routerAddress} />;
+        return (
+          <SettingsWagmiProvider>
+            <section className="space-y-3" aria-labelledby="signing-key-heading">
+              <h2 id="signing-key-heading" className="text-lg font-medium">
+                Signing key
+              </h2>
+              <SigningKeySettings merchant={getAddress(merchant)} router={config.routerAddress} />
+            </section>
+            <section className="space-y-3" aria-labelledby="forward-address-heading">
+              <h2 id="forward-address-heading" className="text-lg font-medium">
+                Forward address
+              </h2>
+              <ForwardAddressSettings
+                merchant={getAddress(merchant)}
+                router={config.routerAddress}
+              />
+            </section>
+          </SettingsWagmiProvider>
+        );
       default:
         return assertNever(config);
     }
@@ -38,9 +61,15 @@ export default async function Page() {
           Back to account
         </Link>
         <h1 id="settings-heading" className="text-2xl font-semibold tracking-tight">
-          Signing key settings
+          Settings
         </h1>
-        {content()}
+        {chainContent()}
+        <section className="space-y-3" aria-labelledby="default-receive-token-heading">
+          <h2 id="default-receive-token-heading" className="text-lg font-medium">
+            Default receive token
+          </h2>
+          <DefaultReceiveTokenSettings />
+        </section>
       </section>
     </main>
   );
