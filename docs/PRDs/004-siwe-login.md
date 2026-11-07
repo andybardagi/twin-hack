@@ -1,6 +1,6 @@
 # 004 — EVM wallet login
 
-## Status: in_progress
+## Status: done
 
 Provide wallet login for `apps/web`: connect, sign, create a session, visit one protected page, and sign out.
 Contract calls and wallet views are deferred to a later PR. Feature 003 remains pending; no Elysia is introduced.
@@ -33,6 +33,6 @@ Contract calls and wallet views are deferred to a later PR. Feature 003 remains 
 - Real Postgres integration tests cover authentication, sessions, sign out, primary address lookup, and isolation
   from another user's wallet. Client tests cover retries and sign-out API/network errors.
 - Run `pnpm lint`, `pnpm typecheck`, `pnpm build` without env, `pnpm test`, `pnpm knip`, and `pnpm format`.
-- Do not attempt a browser wallet flow for T4. Report any verification that could not be exercised.
+- Not yet verified: login with a real browser wallet popup, and both themes visually.
 
 Local environment and login instructions live in `docs/conventions.md`; auth layout lives in `docs/architecture.md`.
