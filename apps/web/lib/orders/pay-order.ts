@@ -1,4 +1,7 @@
-import { isHex } from "viem";
+import { isHex, type Address, type Hex } from "viem";
+import { arbitrum } from "viem/chains";
+
+import { hashOrder } from "@workspace/payments/typed-data";
 
 import { readRouter, type RouterSource } from "@/lib/chain/read-router";
 import type { OrderRepository } from "@/lib/orders/order-repository";
@@ -12,7 +15,19 @@ export type PayOrder =
   | { status: "not-found" }
   | { status: "unverified" }
   | { status: "invalid" }
-  | { status: "expired" | "paid" | "valid"; display: ReturnType<typeof formatOrderDisplay> };
+  | { status: "expired" | "paid"; display: OrderDisplay }
+  | { status: "valid"; display: OrderDisplay; payment: PaymentTerms };
+
+type OrderDisplay = ReturnType<typeof formatOrderDisplay>;
+
+/** What the payer signs against: the order hash commits to the merchant without revealing it. */
+export type PaymentTerms = {
+  router: Address;
+  orderHash: Hex;
+  receiveToken: Address;
+  receiveAmount: string;
+  expiry: number;
+};
 
 export async function verifyPayOrder(
   id: string,
@@ -38,5 +53,16 @@ export async function verifyPayOrder(
   if (chain.paid) return { status: "paid", display };
   if (!chain.signedByKey) return { status: "invalid" };
   if (order.expiresAt <= new Date()) return { status: "expired", display };
-  return { status: "valid", display };
+  const router = routerSource().routerAddress;
+  return {
+    status: "valid",
+    display,
+    payment: {
+      router,
+      orderHash: hashOrder({ chainId: arbitrum.id, router }, signed),
+      receiveToken: signed.receiveToken,
+      receiveAmount: signed.receiveAmount.toString(),
+      expiry: Number(signed.expiry),
+    },
+  };
 }

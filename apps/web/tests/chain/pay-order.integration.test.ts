@@ -103,7 +103,7 @@ it("verifies against the live signing key, then reflects rotation and payment", 
   expect(await drizzleOrderRepository.attachSignature(reserved.id, signature)).not.toBeNull();
 
   const display = { amount: "123.45", token: "USDT" };
-  expect(await verify(reserved.id)).toEqual({ status: "valid", display });
+  expect(await verify(reserved.id)).toMatchObject({ status: "valid", display });
 
   await setSigningKey(rotatedKey);
   expect(await verify(reserved.id)).toEqual({ status: "invalid" });

@@ -17,7 +17,11 @@ import { z } from "zod";
 
 import { assertNever } from "@workspace/payments/assert-never";
 import { paymentRouterAddress } from "@workspace/payments/deployment";
-import { relayPayment } from "@workspace/payments/relay";
+import {
+  relayPayment,
+  type RelayPaymentArgs,
+  type RelayPaymentResult,
+} from "@workspace/payments/relay";
 
 import { getAuth } from "@/lib/auth";
 import { getPrimaryWalletAddress } from "@/lib/wallet-address";
@@ -89,6 +93,14 @@ function getRelayer() {
   relayer ??= createRelayer();
   return relayer;
 }
+
+export type PaymentRelayer = (args: RelayPaymentArgs) => Promise<RelayPaymentResult>;
+
+/** Relays from the RELAYER_PRIVATE_KEY account, which pays the gas. */
+export const relayFromServer: PaymentRelayer = (args) => {
+  const { walletClient, publicClient } = getRelayer();
+  return relayPayment(walletClient, publicClient, args);
+};
 
 async function readJson(request: Request): Promise<unknown> {
   try {

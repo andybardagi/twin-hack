@@ -7,7 +7,7 @@ import { useConfig, useConnectors, type Connector } from "wagmi";
 import { Button } from "@workspace/ui/components/button";
 import { getSignInMessage, signInWallet } from "@/components/auth/sign-in-wallet";
 
-function WalletSignIn() {
+function WalletSignIn({ redirectTo = "/" }: { redirectTo?: string }) {
   const config = useConfig();
   const availableConnectors = useConnectors();
   const [hydrated, setHydrated] = useState(false);
@@ -25,7 +25,7 @@ function WalletSignIn() {
   const signIn = useMutation({
     mutationFn: (connector: Connector) => signInWallet(config, connector, window.location),
     retry: false,
-    onSuccess: () => window.location.replace("/"),
+    onSuccess: () => window.location.replace(redirectTo),
   });
 
   return (
@@ -65,7 +65,9 @@ function WalletSignIn() {
           ))}
         {signIn.isPending && <p>Check your wallet to connect and approve the sign-in message.</p>}
         {signIn.isError && <p>{getSignInMessage(signIn.error)}</p>}
-        {signIn.isSuccess && <p>Signed in. Taking you home…</p>}
+        {signIn.isSuccess && (
+          <p>{redirectTo === "/" ? "Signed in. Taking you home…" : "Signed in. Continuing…"}</p>
+        )}
       </div>
     </section>
   );
