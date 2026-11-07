@@ -95,7 +95,10 @@ export function payOrderRoutes(
       });
       switch (result.kind) {
         case "settled":
-          await repository.markSettled(stored.id);
+          await repository.markSettled(stored.id, {
+            payerAddress: getAddress(payer),
+            txHash: result.hash,
+          });
           return { hash: result.hash };
         case "invalid-order":
           return status(409, { message: invalidOrderMessage(result.reason) });

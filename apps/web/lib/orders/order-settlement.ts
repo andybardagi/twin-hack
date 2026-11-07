@@ -1,7 +1,7 @@
 import type { Order, OrderRepository } from "@/lib/orders/order-repository";
 import type { OrderStatus } from "@/src/helpers/order-schema";
 
-function deriveOrderStatus({ expiresAt, settledAt }: Order, now: Date): OrderStatus {
+export function deriveOrderStatus({ expiresAt, settledAt }: Order, now: Date): OrderStatus {
   if (settledAt) return "paid";
   return expiresAt <= now ? "expired" : "open";
 }

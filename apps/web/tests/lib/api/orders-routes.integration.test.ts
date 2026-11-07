@@ -208,6 +208,8 @@ test("returns a generic error when the repository returns a non-v7 order id", as
         id: "550e8400-e29b-41d4-a716-446655440000",
         signature: null,
         settledAt: null,
+        payerAddress: null,
+        txHash: null,
         createdAt: new Date(),
       };
     },

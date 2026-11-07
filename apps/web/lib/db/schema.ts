@@ -36,6 +36,9 @@ export const orders = pgTable(
     feeBps: integer("fee_bps").notNull(),
     signature: text("signature"),
     settledAt: timestamp("settled_at"),
+    /** Set when the relayer settles the order; null for orders paid outside the app. */
+    payerAddress: text("payer_address"),
+    txHash: text("tx_hash"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("orders_merchant_id_idx").on(table.merchantId)],

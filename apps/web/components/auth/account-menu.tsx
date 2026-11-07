@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
 import { useState } from "react";
 import { useCopyToClipboard } from "usehooks-ts";
 
@@ -68,6 +69,9 @@ export function AccountMenu({ address }: { address: string | null }) {
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem className="px-2 py-2" render={<Link href="/orders" />}>
+          Order history
+        </DropdownMenuItem>
         {address && (
           <DropdownMenuItem
             closeOnClick={false}
