@@ -10,15 +10,22 @@ test("accepts a checksummed address and trims pasted whitespace", () => {
   expect(schema.parse({ payoutAddress: ` ${payoutAddress}\n` })).toEqual({ payoutAddress });
 });
 
-test.each(["", "not an address", payoutAddress.toLowerCase(), payoutAddress.replace("F", "f")])(
-  "rejects %j as not checksummed",
+test("accepts an all-lowercase address and returns it checksummed", () => {
+  expect(schema.parse({ payoutAddress: payoutAddress.toLowerCase() })).toEqual({ payoutAddress });
+});
+
+test.each(["", "not an address", payoutAddress.replace("F", "f")])(
+  "rejects %j as invalid",
   (value) => {
     const result = schema.safeParse({ payoutAddress: value });
-    expect(result.error?.issues[0]?.message).toBe("Enter a checksummed address.");
+    expect(result.error?.issues[0]?.message).toBe("Enter a valid address.");
   },
 );
 
-test("rejects the router address, matching the contract's InvalidPayout", () => {
-  const result = schema.safeParse({ payoutAddress: router });
-  expect(result.error?.issues[0]?.message).toContain("payment router");
-});
+test.each([router, router.toLowerCase()])(
+  "rejects the router address %s, matching the contract's InvalidPayout",
+  (value) => {
+    const result = schema.safeParse({ payoutAddress: value });
+    expect(result.error?.issues[0]?.message).toContain("payment router");
+  },
+);
