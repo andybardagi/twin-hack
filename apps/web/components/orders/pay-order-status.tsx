@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { assertNever } from "@workspace/payments/assert-never";
 
 import { OrderAmount } from "@/components/orders/order-amount";
+import { PaymentConfirmed } from "@/components/orders/payment-confirmed";
 import type { PayOrder } from "@/lib/orders/pay-order";
 
 export function PayOrderStatus({
@@ -28,10 +29,9 @@ export function PayOrderStatus({
       );
     case "paid":
       return (
-        <>
+        <PaymentConfirmed title="Order paid">
           <OrderAmount {...order.display} />
-          <p role="status">This order has been paid.</p>
-        </>
+        </PaymentConfirmed>
       );
     case "expired":
       return (

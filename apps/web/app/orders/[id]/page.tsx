@@ -1,12 +1,14 @@
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { formatUnits } from "viem";
 import { z } from "zod";
 
-import { OrderAmount } from "@/components/orders/order-amount";
+import { AppScreen } from "@/components/app-shell/app-screen";
 import { OrderSettlement } from "@/components/orders/order-settlement";
 import { getAuth } from "@/lib/auth";
 import { findMerchantOrder } from "@/lib/orders/find-merchant-order";
 import { formatOrderDisplay } from "@/src/helpers/order-display";
+import { findCollectableToken } from "@/src/helpers/tokens";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const requestHeaders = await headers();
@@ -19,19 +21,20 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   const origin = new URL(z.url().parse(process.env.BETTER_AUTH_URL)).origin;
   const payUrl = new URL(`/pay/order/${order.id}`, origin).href;
+  const token = findCollectableToken(order.tokenAddress);
+  const chargeAgain = token
+    ? `/?${new URLSearchParams({ token: token.address, amount: formatUnits(BigInt(order.amount), token.decimals) })}`
+    : "/";
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-8 py-16 text-foreground">
-      <section
-        aria-labelledby="order-heading"
-        className="w-full max-w-lg space-y-6 rounded-xl border border-border bg-card p-6 text-card-foreground"
-      >
-        <h1 id="order-heading" className="text-2xl font-semibold tracking-tight">
-          Order
-        </h1>
-        <OrderAmount {...formatOrderDisplay(order.amount, order.tokenAddress)} />
-        <OrderSettlement id={order.id} payUrl={payUrl} />
-      </section>
-    </main>
+    <AppScreen>
+      <OrderSettlement
+        id={order.id}
+        payUrl={payUrl}
+        expiresAt={order.expiresAt.toISOString()}
+        display={formatOrderDisplay(order.amount, order.tokenAddress)}
+        chargeAgainHref={chargeAgain}
+      />
+    </AppScreen>
   );
 }

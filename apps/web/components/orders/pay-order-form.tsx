@@ -10,8 +10,7 @@ import { useConfig, useConnectors, WagmiProvider, type Connector } from "wagmi";
 import { assertNever } from "@workspace/payments/assert-never";
 import { tokens as paymentTokens, type TokenSymbol } from "@workspace/payments/tokens";
 import { Button } from "@workspace/ui/components/button";
-import { Field, FieldDescription, FieldLabel } from "@workspace/ui/components/field";
-import { NativeSelect, NativeSelectOption } from "@workspace/ui/components/native-select";
+import { Field, FieldDescription } from "@workspace/ui/components/field";
 
 import {
   payOrder,
@@ -21,14 +20,15 @@ import {
   quotePayment,
   type PayStep,
 } from "@/components/orders/pay-order";
+import { TokenPicker } from "@/components/tokens/token-picker";
 import type { PaymentTerms } from "@/lib/orders/pay-order";
 import { wagmiConfig } from "@/lib/wagmi";
 import { tokens } from "@/src/helpers/tokens";
 
 const QUOTE_REFRESH_MS = 15_000;
 
-const payTokenSymbols = tokens
-  .filter((token) => token.config.canPay)
+const payTokens = tokens.filter((token) => token.config.canPay);
+const payTokenSymbols = payTokens
   .map((token) => paymentTokenSymbol(token.address))
   .filter((symbol) => symbol !== undefined);
 
@@ -93,24 +93,19 @@ function PayOrderFields({
   return (
     <div className="space-y-4" aria-busy={payment.isPending}>
       <Field>
-        <FieldLabel htmlFor="pay-token">Pay with</FieldLabel>
-        <NativeSelect
-          id="pay-token"
-          className="w-full"
-          value={payToken}
+        <span className="text-sm font-medium">Pay with</span>
+        <TokenPicker
+          variant="field"
+          title="Pay with"
+          description="Choose the stablecoin you want to pay from. The merchant still receives their token."
+          tokens={payTokens}
+          value={payTokens.find((token) => paymentTokenSymbol(token.address) === payToken)}
           disabled={busy}
-          aria-describedby="pay-token-quote"
-          onChange={(event) => {
-            const symbol = payTokenSymbols.find((symbol) => symbol === event.target.value);
+          onChange={(token) => {
+            const symbol = paymentTokenSymbol(token.address);
             if (symbol) setPayToken(symbol);
           }}
-        >
-          {payTokenSymbols.map((symbol) => (
-            <NativeSelectOption key={symbol} value={symbol}>
-              {payTokenLabel(symbol)}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        />
         <FieldDescription id="pay-token-quote" aria-live="polite">
           {quoted.isPending && "Getting a quote…"}
           {quoted.isError && "Couldn’t get a quote right now. It will retry shortly."}

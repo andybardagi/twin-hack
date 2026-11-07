@@ -1,45 +1,64 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { getAddress } from "viem";
 
-import { Button } from "@workspace/ui/components/button";
-
-import { SignOutButton } from "@/components/auth/sign-out-button";
+import { AppHeader } from "@/components/app-shell/app-header";
+import { AppScreen } from "@/components/app-shell/app-screen";
+import { OrderSigningGate } from "@/components/orders/order-signing-gate";
 import { getAuth } from "@/lib/auth";
+import { getRouterReader } from "@/lib/chain/viem-router-reader";
+import { drizzleMerchantSettingsRepository } from "@/lib/merchant-settings/drizzle-merchant-settings-repository";
 import { getPrimaryWalletAddress } from "@/lib/wallet-address";
+import { findCollectableToken } from "@/src/helpers/tokens";
 
-export default async function Page() {
-  const requestHeaders = await headers();
-  const session = await getAuth().api.getSession({ headers: requestHeaders });
+/** `?token=&amount=` prefill the keypad, e.g. "Charge again" on an expired order. */
+function prefill(searchParams: Record<string, string | string[] | undefined>) {
+  const { token, amount } = searchParams;
+  return {
+    initialTokenAddress:
+      typeof token === "string" ? findCollectableToken(token)?.address : undefined,
+    initialAmount: typeof amount === "string" && /^\d+(\.\d+)?$/.test(amount) ? amount : undefined,
+  };
+}
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/sign-in");
 
-  const address = await getPrimaryWalletAddress(session.user.id);
+  const wallet = await getPrimaryWalletAddress(session.user.id);
+  if (!wallet)
+    return (
+      <AppScreen>
+        <AppHeader address={null} />
+        <p role="alert" className="m-auto max-w-xs px-8 text-center text-balance">
+          Your wallet address couldn’t be found. Sign out and sign in again to retry.
+        </p>
+      </AppScreen>
+    );
+
+  const merchant = getAddress(wallet);
+  const { routerAddress, reader } = getRouterReader();
+  // A failed read reaches the error boundary, which offers a retry; it never opens the keypad.
+  const [signingKey, settings] = await Promise.all([
+    reader.signingKeyOf(merchant),
+    drizzleMerchantSettingsRepository.findByMerchantId(session.user.id),
+  ]);
+  const defaultToken = settings && findCollectableToken(settings.defaultTokenAddress);
 
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-8 py-16 text-foreground">
-      <section
-        aria-labelledby="account-heading"
-        className="w-full max-w-lg space-y-6 rounded-xl border border-border bg-card p-6 text-card-foreground"
-      >
-        <h1 id="account-heading" className="text-2xl font-semibold tracking-tight">
-          Your account
-        </h1>
-        {address ? (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Signed in with</p>
-            <p className="break-all font-mono text-sm">{address}</p>
-          </div>
-        ) : (
-          <p role="alert" className="text-sm text-muted-foreground">
-            Your wallet address couldn’t be found. Sign out and sign in again to retry.
-          </p>
-        )}
-        <Button render={<Link href="/orders/new" />}>New order</Button>
-        <Button variant="outline" render={<Link href="/settings" />}>
-          Settings
-        </Button>
-        <SignOutButton />
-      </section>
-    </main>
+    <AppScreen>
+      <AppHeader address={merchant} />
+      <OrderSigningGate
+        merchant={merchant}
+        router={routerAddress}
+        signingKey={signingKey}
+        defaultTokenAddress={defaultToken?.address ?? ""}
+        {...prefill(await searchParams)}
+      />
+    </AppScreen>
   );
 }
