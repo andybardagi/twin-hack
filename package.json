@@ -1,0 +1,29 @@
+{
+  "name": "next-monorepo",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "storybook": "turbo run storybook",
+    "build-storybook": "turbo run build-storybook",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt --check",
+    "format:fix": "oxfmt .",
+    "typecheck": "turbo typecheck",
+    "knip": "knip"
+  },
+  "devDependencies": {
+    "@workspace/typescript-config": "workspace:*",
+    "knip": "^6.32.1",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
+    "turbo": "^2.9.18",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.4"
+}

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  },
+  "ignoreUnresolved": ["next"],
+  "workspaces": {
+    ".": {
+      "entry": ["package.json", "turbo.json", "tsconfig.json", "pnpm-workspace.yaml"],
+      "project": []
+    },
+    "apps/web": {
+      "entry": ["app/**/*.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}"],
+      "project": [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "hooks/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+        "src/**/*.{ts,tsx}",
+        "tests/**/*.{ts,tsx}",
+        "*.{ts,mjs}"
+      ],
+      "next": true,
+      "postcss": {
+        "config": "postcss.config.mjs"
+      },
+      "ignoreDependencies": ["@tanstack/react-form", "zod"]
+    },
+    "apps/storybook": {
+      "entry": ["stories/**/*.stories.tsx"],
+      "project": [".storybook/**/*.{ts,tsx}", "stories/**/*.{ts,tsx}"],
+      "storybook": true,
+      "vite": true
+    },
+    "packages/ui": {
+      "entry": ["src/components/**/*.{ts,tsx}", "src/hooks/**/*.ts", "src/lib/**/*.ts"],
+      "project": [
+        "src/components/**/*.{ts,tsx}",
+        "src/hooks/**/*.ts",
+        "src/lib/**/*.ts",
+        "src/styles/**/*.css"
+      ],
+      "postcss": {
+        "config": "postcss.config.mjs"
+      },
+      "ignoreDependencies": ["next-themes", "zod", "@turbo/gen"]
+    }
+  }
+}

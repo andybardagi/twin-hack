@@ -1,0 +1,31 @@
+{
+  "name": "@workspace/storybook",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt --check",
+    "format:fix": "oxfmt .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@workspace/ui": "workspace:*",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "3.8.0"
+  },
+  "devDependencies": {
+    "@storybook/react-vite": "^10.5.5",
+    "@tailwindcss/vite": "^4",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@workspace/typescript-config": "workspace:*",
+    "storybook": "^10.5.5",
+    "typescript": "^5",
+    "vite": "^8.1.5"
+  }
+}
