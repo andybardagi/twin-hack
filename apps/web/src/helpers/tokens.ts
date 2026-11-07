@@ -58,6 +58,11 @@ const tokenMetadata: Record<TokenSymbol, Omit<Token, "symbol" | "address" | "dec
   },
 };
 
+export function findCollectableToken(address: string): Token | undefined {
+  const token = tokens.find((token) => token.address.toLowerCase() === address.toLowerCase());
+  return token?.config.canCollect ? token : undefined;
+}
+
 export const tokens: Token[] = Object.entries(paymentTokens).map(([symbol, token]) => {
   if (!isTokenSymbol(symbol)) throw new Error(`Unknown token: ${symbol}`);
   return {

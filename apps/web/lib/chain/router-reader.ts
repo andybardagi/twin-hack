@@ -5,3 +5,7 @@ export interface RouterReader {
   feeBps(): Promise<number>;
   paid(merchant: Address, orderId: Hex): Promise<boolean>;
 }
+
+export type RouterReaderResult =
+  | { status: "not-configured" }
+  | { status: "configured"; routerAddress: Address; reader: RouterReader };

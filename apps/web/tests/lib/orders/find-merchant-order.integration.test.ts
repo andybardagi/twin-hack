@@ -6,7 +6,7 @@ import { getDb } from "@/lib/db/client";
 import { orders, user } from "@/lib/db/schema";
 import { drizzleOrderRepository } from "@/lib/orders/drizzle-order-repository";
 import { findMerchantOrder } from "@/lib/orders/find-merchant-order";
-import { tokens } from "@/src/helpers/tokens";
+import { createSignedOrder, reservationInput } from "./order-fixture";
 
 const merchantIds: string[] = [];
 
@@ -17,23 +17,19 @@ afterEach(async () => {
   merchantIds.length = 0;
 });
 
-test("only returns an order to its owner", async () => {
+test("only returns a signed order to its owner", async () => {
   const merchantId = v7();
   const otherMerchantId = v7();
   merchantIds.push(merchantId, otherMerchantId);
   await getDb()
     .insert(user)
     .values(merchantIds.map((id) => ({ id, name: "Merchant", email: `${id}@example.com` })));
-  const token = tokens.find((token) => token.symbol === "USDT");
-  if (!token) throw new Error("Missing USDT token");
-  const order = await drizzleOrderRepository.create({
-    merchantId,
-    amount: "123450000",
-    tokenAddress: token.address,
-  });
+  const order = await createSignedOrder(merchantId);
+  const unsigned = await drizzleOrderRepository.create(reservationInput(merchantId));
 
   expect(await findMerchantOrder(order.id, merchantId)).toEqual(order);
   expect(await findMerchantOrder(order.id, otherMerchantId)).toBeNull();
+  expect(await findMerchantOrder(unsigned.id, merchantId)).toBeNull();
   expect(await findMerchantOrder(v7(), merchantId)).toBeNull();
 });
 

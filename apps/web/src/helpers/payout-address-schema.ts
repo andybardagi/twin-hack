@@ -1,7 +1,7 @@
 import { getAddress, isAddress, type Address } from "viem";
 import { z } from "zod";
 
-const checksummedAddressSchema = z.custom<Address>(
+export const checksummedAddressSchema = z.custom<Address>(
   (value) =>
     typeof value === "string" && isAddress(value, { strict: false }) && getAddress(value) === value,
   "Enter a checksummed address.",

@@ -5,11 +5,7 @@ import { paymentRouterAbi } from "@workspace/payments/abi";
 import { assertNever } from "@workspace/payments/assert-never";
 
 import { getChainConfig } from "@/lib/chain/chain-config";
-import type { RouterReader } from "@/lib/chain/router-reader";
-
-type RouterReaderResult =
-  | { status: "not-configured" }
-  | { status: "configured"; reader: RouterReader };
+import type { RouterReaderResult } from "@/lib/chain/router-reader";
 
 export function getRouterReader(): RouterReaderResult {
   const config = getChainConfig();
@@ -21,6 +17,7 @@ export function getRouterReader(): RouterReaderResult {
       const contract = { address: config.routerAddress, abi: paymentRouterAbi };
       return {
         status: "configured",
+        routerAddress: config.routerAddress,
         reader: {
           signingKeyOf: (merchant) =>
             client.readContract({ ...contract, functionName: "signingKeyOf", args: [merchant] }),

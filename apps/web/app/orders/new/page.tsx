@@ -1,8 +1,46 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAddress } from "viem";
 
-import { CreateOrderForm } from "@/components/orders/create-order-form";
+import { assertNever } from "@workspace/payments/assert-never";
+
+import { OrderSigningGate } from "@/components/orders/order-signing-gate";
 import { getAuth } from "@/lib/auth";
+import { getRouterReader } from "@/lib/chain/viem-router-reader";
+import { drizzleMerchantSettingsRepository } from "@/lib/merchant-settings/drizzle-merchant-settings-repository";
+import { getPrimaryWalletAddress } from "@/lib/wallet-address";
+import { findCollectableToken } from "@/src/helpers/tokens";
+
+async function orderContent(merchantId: string) {
+  const wallet = await getPrimaryWalletAddress(merchantId);
+  if (!wallet) {
+    return <p role="alert">Your wallet couldn’t be found. Sign out and sign in again.</p>;
+  }
+  const merchant = getAddress(wallet);
+  const chain = getRouterReader();
+  switch (chain.status) {
+    case "not-configured":
+      return <p>Creating orders is not available yet. Try again later.</p>;
+    case "configured": {
+      // A failed read reaches the error boundary, which offers a retry; it never opens the form.
+      const [signingKey, settings] = await Promise.all([
+        chain.reader.signingKeyOf(merchant),
+        drizzleMerchantSettingsRepository.findByMerchantId(merchantId),
+      ]);
+      const defaultToken = settings && findCollectableToken(settings.defaultTokenAddress);
+      return (
+        <OrderSigningGate
+          merchant={merchant}
+          router={chain.routerAddress}
+          signingKey={signingKey}
+          defaultTokenAddress={defaultToken?.address ?? ""}
+        />
+      );
+    }
+    default:
+      return assertNever(chain);
+  }
+}
 
 export default async function Page() {
   const requestHeaders = await headers();
@@ -18,7 +56,7 @@ export default async function Page() {
         <h1 id="create-order-heading" className="text-2xl font-semibold tracking-tight">
           New order
         </h1>
-        <CreateOrderForm />
+        {await orderContent(session.user.id)}
       </section>
     </main>
   );

@@ -3,7 +3,10 @@
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import type { Hex } from "viem";
 import type { z } from "zod";
+
+import type { Order } from "@workspace/payments/typed-data";
 
 import { Button } from "@workspace/ui/components/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@workspace/ui/components/field";
@@ -11,16 +14,26 @@ import { Input } from "@workspace/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@workspace/ui/components/native-select";
 
 import { createOrder, CreateOrderError } from "@/components/orders/create-order";
+import { DeviceKeyError } from "@/lib/signing-key/device-key";
 import { orderInputSchema } from "@/src/helpers/order-schema";
 import { tokens } from "@/src/helpers/tokens";
 
 const collectableTokens = tokens.filter((token) => token.config.canCollect);
-const defaultValues: z.input<typeof orderInputSchema> = { tokenAddress: "", amount: "" };
 
-function CreateOrderForm() {
+function CreateOrderForm({
+  defaultTokenAddress,
+  sign,
+}: {
+  defaultTokenAddress: string;
+  sign: (order: Order) => Promise<Hex>;
+}) {
   const router = useRouter();
+  const defaultValues: z.input<typeof orderInputSchema> = {
+    tokenAddress: defaultTokenAddress,
+    amount: "",
+  };
   const mutation = useMutation({
-    mutationFn: createOrder,
+    mutationFn: (input: z.input<typeof orderInputSchema>) => createOrder(input, sign),
     retry: false,
     onSuccess: ({ id }) => router.push(`/orders/${id}`),
     onError: (error) => {
@@ -110,7 +123,9 @@ function CreateOrderForm() {
       </form.Subscribe>
       {mutation.isError && (
         <p role="alert" className="text-sm text-destructive">
-          Couldn’t create the order. Check the token, amount and your connection, then try again.
+          {mutation.error instanceof DeviceKeyError
+            ? mutation.error.message
+            : "Couldn’t create the order. Check the token, amount and your connection, then try again."}
         </p>
       )}
       <form.Subscribe selector={(state) => state.isSubmitting}>

@@ -1,9 +1,10 @@
-import { z } from "zod";
+import type { Hex } from "viem";
+import type { z } from "zod";
+
+import type { Order } from "@workspace/payments/typed-data";
 
 import { apiClient } from "@/lib/api-client";
-import { orderInputSchema } from "@/src/helpers/order-schema";
-
-const createdOrderSchema = z.object({ id: z.uuidv7() });
+import { orderInputSchema, reservedOrderSchema, toSignableOrder } from "@/src/helpers/order-schema";
 
 export class CreateOrderError extends Error {
   constructor(public readonly status: number) {
@@ -13,10 +14,16 @@ export class CreateOrderError extends Error {
 
 export async function createOrder(
   input: z.input<typeof orderInputSchema>,
-): Promise<z.output<typeof createdOrderSchema>> {
+  sign: (order: Order) => Promise<Hex>,
+): Promise<{ id: string }> {
   const { tokenAddress } = orderInputSchema.parse(input);
   // The API converts the decimal amount to base units; send the schema's input.
-  const { data, error } = await apiClient.api.orders.post({ tokenAddress, amount: input.amount });
-  if (error) throw new CreateOrderError(error.status);
-  return createdOrderSchema.parse(data);
+  const reservation = await apiClient.api.orders.post({ tokenAddress, amount: input.amount });
+  if (reservation.error) throw new CreateOrderError(reservation.error.status);
+  const order = reservedOrderSchema.parse(reservation.data);
+
+  const signature = await sign(toSignableOrder(order));
+  const attached = await apiClient.api.orders({ id: order.id }).signature.post({ signature });
+  if (attached.error) throw new CreateOrderError(attached.error.status);
+  return { id: order.id };
 }

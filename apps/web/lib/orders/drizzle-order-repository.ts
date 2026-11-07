@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull } from "drizzle-orm";
 import { v7 } from "uuid";
 import { z } from "zod";
 
@@ -18,7 +18,29 @@ export const drizzleOrderRepository: OrderRepository = {
   async findById(id) {
     if (!z.uuid().safeParse(id).success) return null;
 
-    const [order] = await getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
+    const [order] = await getDb()
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, id), isNotNull(orders.signature)))
+      .limit(1);
+    return order ?? null;
+  },
+  async findForSigning(id, merchantId) {
+    if (!z.uuid().safeParse(id).success) return null;
+
+    const [order] = await getDb()
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, id), eq(orders.merchantId, merchantId)))
+      .limit(1);
+    return order ?? null;
+  },
+  async attachSignature(id, signature) {
+    const [order] = await getDb()
+      .update(orders)
+      .set({ signature })
+      .where(and(eq(orders.id, id), isNull(orders.signature), gt(orders.expiresAt, new Date())))
+      .returning();
     return order ?? null;
   },
 };

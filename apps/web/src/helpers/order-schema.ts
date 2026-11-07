@@ -1,7 +1,11 @@
-import { maxUint256, parseUnits } from "viem";
+import { maxUint256, parseUnits, type Hex } from "viem";
 import { z } from "zod";
 
-import { tokens } from "@/src/helpers/tokens";
+import type { Order } from "@workspace/payments/typed-data";
+
+import { orderIdToBytes32 } from "@/src/helpers/order-id";
+import { checksummedAddressSchema } from "@/src/helpers/payout-address-schema";
+import { findCollectableToken } from "@/src/helpers/tokens";
 
 export const orderInputSchema = z
   .object({
@@ -9,10 +13,8 @@ export const orderInputSchema = z
     amount: z.string().regex(/^\d+(\.\d+)?$/, "Enter a positive decimal amount."),
   })
   .transform((input, context) => {
-    const token = tokens.find(
-      (token) => token.address.toLowerCase() === input.tokenAddress.toLowerCase(),
-    );
-    if (!token?.config.canCollect) {
+    const token = findCollectableToken(input.tokenAddress);
+    if (!token) {
       context.addIssue({
         code: "custom",
         path: ["tokenAddress"],
@@ -43,3 +45,38 @@ export const orderInputSchema = z
 
     return { tokenAddress: token.address, amount: amount.toString() };
   });
+
+export const reservedOrderSchema = z.object({
+  id: z.uuidv7(),
+  merchant: checksummedAddressSchema,
+  receiveToken: checksummedAddressSchema,
+  receiveAmount: z.string().regex(/^\d+$/),
+  expiry: z.number().int().positive(),
+  feeBps: z.number().int().nonnegative(),
+});
+
+export type ReservedOrder = z.infer<typeof reservedOrderSchema>;
+
+export const orderSignatureSchema = z.object({
+  signature: z.custom<Hex>(
+    (value) => typeof value === "string" && /^0x[0-9a-f]{130}$/i.test(value),
+  ),
+});
+
+export function toSignableOrder({
+  id,
+  merchant,
+  receiveToken,
+  receiveAmount,
+  expiry,
+  feeBps,
+}: ReservedOrder): Order {
+  return {
+    merchant,
+    receiveToken,
+    receiveAmount: BigInt(receiveAmount),
+    orderId: orderIdToBytes32(id),
+    expiry: BigInt(expiry),
+    feeBps,
+  };
+}
