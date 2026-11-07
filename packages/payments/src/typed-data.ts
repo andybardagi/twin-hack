@@ -30,6 +30,7 @@ const paymentRouterTypes = {
     { name: "receiveAmount", type: "uint256" },
     { name: "orderId", type: "bytes32" },
     { name: "expiry", type: "uint64" },
+    { name: "feeBps", type: "uint16" },
   ],
   Intent: [
     { name: "payer", type: "address" },

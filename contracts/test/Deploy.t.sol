@@ -6,14 +6,21 @@ import {Deploy} from "../script/Deploy.s.sol";
 import {PaymentRouter} from "../src/PaymentRouter.sol";
 
 contract DeployTest is Test {
-    uint256 constant FORK_BLOCK = 522_117_000;
     string constant DEFAULT_RPC_URL = "https://arb1.arbitrum.io/rpc";
     uint256 constant DEPLOYER_KEY = 0xA11CE;
     uint16 constant FEE_BPS = 50;
     address constant USDT0 = 0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9;
 
+    /// @dev Forks the latest block unless FORK_BLOCK is set (needs an archive RPC for older blocks).
+    function _fork() internal {
+        string memory rpcUrl = vm.envOr("ARBITRUM_RPC_URL", DEFAULT_RPC_URL);
+        uint256 forkBlock = vm.envOr("FORK_BLOCK", uint256(0));
+        if (forkBlock == 0) vm.createSelectFork(rpcUrl);
+        else vm.createSelectFork(rpcUrl, forkBlock);
+    }
+
     function test_deploysWithAllTwinPools() public {
-        vm.createSelectFork(vm.envOr("ARBITRUM_RPC_URL", DEFAULT_RPC_URL), FORK_BLOCK);
+        _fork();
         vm.setEnv("DEPLOYER_PRIVATE_KEY", vm.toString(DEPLOYER_KEY));
         PaymentRouter router = new Deploy().run();
 

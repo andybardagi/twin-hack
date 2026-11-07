@@ -5,8 +5,8 @@ import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 interface ICurveTwocrypto {
     function coins(uint256 index) external view returns (address);
@@ -25,6 +25,7 @@ contract PaymentRouter is EIP712, Ownable2Step {
         uint256 receiveAmount;
         bytes32 orderId;
         uint64 expiry;
+        uint16 feeBps;
     }
 
     struct Intent {
@@ -43,8 +44,9 @@ contract PaymentRouter is EIP712, Ownable2Step {
         bytes32 s;
     }
 
-    bytes32 public constant ORDER_TYPEHASH =
-        keccak256("Order(address merchant,address receiveToken,uint256 receiveAmount,bytes32 orderId,uint64 expiry)");
+    bytes32 public constant ORDER_TYPEHASH = keccak256(
+        "Order(address merchant,address receiveToken,uint256 receiveAmount,bytes32 orderId,uint64 expiry,uint16 feeBps)"
+    );
     bytes32 public constant INTENT_TYPEHASH =
         keccak256("Intent(address payer,address payToken,uint256 maxPayAmount,bytes32 orderHash)");
 
@@ -94,6 +96,7 @@ contract PaymentRouter is EIP712, Ownable2Step {
     error UnsupportedToken(address token);
     error InvalidPayout();
     error MaxPayExceeded();
+    error FeeMismatch();
 
     constructor(
         address initialOwner,
@@ -155,7 +158,13 @@ contract PaymentRouter is EIP712, Ownable2Step {
         return _hashTypedDataV4(
             keccak256(
                 abi.encode(
-                    ORDER_TYPEHASH, order.merchant, order.receiveToken, order.receiveAmount, order.orderId, order.expiry
+                    ORDER_TYPEHASH,
+                    order.merchant,
+                    order.receiveToken,
+                    order.receiveAmount,
+                    order.orderId,
+                    order.expiry,
+                    order.feeBps
                 )
             )
         );
@@ -172,9 +181,15 @@ contract PaymentRouter is EIP712, Ownable2Step {
         view
     {
         bytes32 orderHash = hashOrder(order);
-        if (ECDSA.recover(orderHash, merchantSig) != signingKeyOf[order.merchant]) revert InvalidMerchantSignature();
-        if (ECDSA.recover(hashIntent(intent), payerSig) != intent.payer) revert InvalidPayerSignature();
+        address signingKey = signingKeyOf[order.merchant];
+        if (signingKey == address(0) || !SignatureChecker.isValidSignatureNow(signingKey, orderHash, merchantSig)) {
+            revert InvalidMerchantSignature();
+        }
+        if (!SignatureChecker.isValidSignatureNow(intent.payer, hashIntent(intent), payerSig)) {
+            revert InvalidPayerSignature();
+        }
         if (intent.orderHash != orderHash) revert OrderHashMismatch();
+        if (order.feeBps != feeBps) revert FeeMismatch();
         if (block.timestamp > order.expiry) revert OrderExpired();
         if (paid[order.merchant][order.orderId]) revert OrderAlreadyPaid();
         _requireSupported(order.receiveToken);

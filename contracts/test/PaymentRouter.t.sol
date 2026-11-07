@@ -4,12 +4,32 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {ICurveTwocrypto, PaymentRouter} from "../src/PaymentRouter.sol";
 
+/// @dev Minimal smart-contract wallet: accepts hashes it was told to sign and approves tokens itself.
+contract ERC1271Payer is IERC1271 {
+    using SafeERC20 for IERC20;
+
+    mapping(bytes32 hash => bool) public signedHashes;
+
+    function signHash(bytes32 hash) external {
+        signedHashes[hash] = true;
+    }
+
+    function approve(IERC20 token, address spender) external {
+        token.forceApprove(spender, type(uint256).max);
+    }
+
+    function isValidSignature(bytes32 hash, bytes calldata) external view returns (bytes4) {
+        return signedHashes[hash] ? IERC1271.isValidSignature.selector : bytes4(0xffffffff);
+    }
+}
+
 contract PaymentRouterTest is Test {
-    uint256 constant FORK_BLOCK = 522_117_000;
     string constant DEFAULT_RPC_URL = "https://arb1.arbitrum.io/rpc";
 
     IERC20 constant USDT0 = IERC20(0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9);
@@ -39,8 +59,16 @@ contract PaymentRouterTest is Test {
     uint256 payerPk;
     address payer;
 
+    /// @dev Forks the latest block unless FORK_BLOCK is set (needs an archive RPC for older blocks).
+    function _fork() internal {
+        string memory rpcUrl = vm.envOr("ARBITRUM_RPC_URL", DEFAULT_RPC_URL);
+        uint256 forkBlock = vm.envOr("FORK_BLOCK", uint256(0));
+        if (forkBlock == 0) vm.createSelectFork(rpcUrl);
+        else vm.createSelectFork(rpcUrl, forkBlock);
+    }
+
     function setUp() public {
-        vm.createSelectFork(vm.envOr("ARBITRUM_RPC_URL", DEFAULT_RPC_URL), FORK_BLOCK);
+        _fork();
         (merchantKey, merchantKeyPk) = makeAddrAndKey("merchantKey");
         (payer, payerPk) = makeAddrAndKey("payer");
 
@@ -78,7 +106,8 @@ contract PaymentRouterTest is Test {
             receiveToken: address(token),
             receiveAmount: amount,
             orderId: orderId,
-            expiry: uint64(block.timestamp) + ORDER_TTL
+            expiry: uint64(block.timestamp) + ORDER_TTL,
+            feeBps: router.feeBps()
         });
     }
 
@@ -353,6 +382,36 @@ contract PaymentRouterTest is Test {
         uint256 usdt0Needed = ICurveTwocrypto(ARGT_POOL).get_dx(1, 0, ARGT_AMOUNT);
         uint256 maxPay = _withSlippage(ICurveTwocrypto(BRAT_POOL).get_dx(0, 1, _withSlippage(usdt0Needed)));
         _assertSwapSettles(BRAT, ARGT, ARGT_AMOUNT, maxPay, _noPermit());
+    }
+
+    function test_revertsWhenFeeChangedAfterSigning() public {
+        PaymentRouter.Order memory order = _order(USDT0, USDT0_AMOUNT, keccak256("order-1"));
+        PaymentRouter.Intent memory intent = _intent(order, USDT0, USDT0_AMOUNT);
+        bytes memory merchantSig = _sign(merchantKeyPk, router.hashOrder(order));
+        bytes memory payerSig = _sign(payerPk, router.hashIntent(intent));
+        vm.prank(owner);
+        router.setFeeBps(FEE_BPS + 1);
+        vm.expectRevert(PaymentRouter.FeeMismatch.selector);
+        router.pay(order, merchantSig, intent, payerSig, _noPermit());
+    }
+
+    function test_settlesForContractWalletPayer() public {
+        ERC1271Payer wallet = new ERC1271Payer();
+        _fund(USDT0, ARGT_POOL, address(wallet), USDT0_AMOUNT);
+        wallet.approve(USDT0, address(router));
+        PaymentRouter.Order memory order = _order(USDT0, USDT0_AMOUNT, keccak256("order-1"));
+        PaymentRouter.Intent memory intent = PaymentRouter.Intent({
+            payer: address(wallet),
+            payToken: address(USDT0),
+            maxPayAmount: USDT0_AMOUNT,
+            orderHash: router.hashOrder(order)
+        });
+        wallet.signHash(router.hashIntent(intent));
+
+        router.pay(order, _sign(merchantKeyPk, router.hashOrder(order)), intent, "", _noPermit());
+
+        assertEq(USDT0.balanceOf(address(wallet)), 0);
+        assertEq(USDT0.balanceOf(merchant), USDT0_AMOUNT - USDT0_AMOUNT * FEE_BPS / 10_000);
     }
 
     function test_feeCapEnforced() public {

@@ -8,7 +8,6 @@ import {
   isAddress,
   isAddressEqual,
   isHex,
-  maxUint256,
   parseUnits,
   size,
   toHex,
@@ -122,7 +121,7 @@ async function authorizePayment() {
           address: pay.address,
           abi: erc20Abi,
           functionName: "approve",
-          args: [router, maxUint256],
+          args: [router, quoted.maxPayAmount],
         });
         await confirm(hash, "approve");
       }
@@ -140,6 +139,11 @@ const order = {
   receiveAmount,
   orderId: toHex(crypto.getRandomValues(new Uint8Array(32))),
   expiry: deadline,
+  feeBps: await publicClient.readContract({
+    address: router,
+    abi: paymentRouterAbi,
+    functionName: "feeBps",
+  }),
 };
 const intent = {
   payer: customer.account.address,

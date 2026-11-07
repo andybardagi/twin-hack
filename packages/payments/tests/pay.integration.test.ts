@@ -35,7 +35,6 @@ import {
   type RouterDomain,
 } from "../src/typed-data";
 
-const FORK_BLOCK = 522_117_000n;
 const RPC_URL = process.env.ARBITRUM_RPC_URL ?? "https://arb1.arbitrum.io/rpc";
 const FEE_BPS = 50;
 const ORDER_TTL_SECONDS = 600n;
@@ -108,11 +107,12 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
 
   beforeAll(async () => {
     const port = await freePort();
+    // Forks the latest block unless FORK_BLOCK is set (needs an archive RPC for older blocks).
+    const forkBlock = process.env.FORK_BLOCK;
     anvil = spawn("anvil", [
       "--fork-url",
       RPC_URL,
-      "--fork-block-number",
-      FORK_BLOCK.toString(),
+      ...(forkBlock ? ["--fork-block-number", forkBlock] : []),
       "--port",
       String(port),
       "--silent",
@@ -232,6 +232,11 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
       receiveAmount: RECEIVE_AMOUNT,
       orderId: keccak256(toHex(orderLabel)),
       expiry: timestamp + ORDER_TTL_SECONDS,
+      feeBps: await publicClient.readContract({
+        address: domain.router,
+        abi: paymentRouterAbi,
+        functionName: "feeBps",
+      }),
     };
     const intent = {
       payer: customer.address,
