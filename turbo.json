@@ -5,6 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "env": ["DATABASE_URL", "BETTER_AUTH_SECRET", "BETTER_AUTH_URL", "RELAYER_PRIVATE_KEY"],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "//#quality": {

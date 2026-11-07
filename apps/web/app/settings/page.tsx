@@ -42,7 +42,9 @@ function SettingCard({
 }
 
 export default async function Page() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  // Read headers first so Next treats `/settings` as dynamic and never prerenders auth at build time.
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) redirect("/sign-in");
   const wallet = await getPrimaryWalletAddress(session.user.id);
   const { routerAddress } = getChainConfig();

@@ -26,7 +26,9 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  // Read headers first so Next treats `/` as dynamic and never prerenders auth at build time.
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) redirect("/sign-in");
 
   const wallet = await getPrimaryWalletAddress(session.user.id);
