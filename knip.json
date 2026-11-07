@@ -11,7 +11,7 @@
       "project": []
     },
     "apps/web": {
-      "entry": ["app/**/*.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}"],
+      "entry": ["app/**/*.{ts,tsx}", "tests/**/*.{test,spec}.{ts,tsx}", "lib/db/client.ts"],
       "project": [
         "app/**/*.{ts,tsx}",
         "components/**/*.{ts,tsx}",

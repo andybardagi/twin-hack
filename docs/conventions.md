@@ -25,6 +25,53 @@ A change is not finished until `pnpm lint && pnpm typecheck && pnpm build` passe
 
 **Unused code:** `pnpm knip` must stay clean. Configure `knip.json` before ignoring issues; never use broad `ignore` patterns.
 
+## Database and migrations
+
+- Postgres + Drizzle ORM (`pg` driver), with drizzle-kit for migrations. Dependencies and scripts belong to `apps/web`.
+- Keep the client and table definitions in `apps/web/lib/db/client.ts` and `apps/web/lib/db/schema.ts`.
+- Server code uses `getDb()` from `@/lib/db/client` at runtime. Importing it is safe without `DATABASE_URL`;
+  calling it without the variable throws an actionable error. Never import it into Client Components.
+- IDs are UUIDv7, generated in app code before insert. ID columns have no database default. Do not use serial IDs,
+  `gen_random_uuid()`, or a database UUIDv7 default. Add the `uuid` dependency and an ID helper only with their first consumer.
+
+From the repo root, start the local database and export its template development URL:
+
+```sh
+docker compose up -d
+docker compose ps
+export DATABASE_URL='postgresql://app:password@localhost:5433/app'
+```
+
+Wait for the `postgres` service to be healthy before querying or migrating. These generic credentials are only for
+local development. Data persists in the `postgres-data` named volume after `docker compose down`.
+
+`DATABASE_URL` is server-only; never prefix it with `NEXT_PUBLIC_`. Export it in the shell for drizzle-kit and future
+integration tests. For Next.js, either export it before starting the app or set it in an **untracked**
+`apps/web/.env.local`. Drizzle scripts do not automatically load `.env.local`. Do not commit environment files or real credentials.
+
+After editing the schema, generate and review SQL, then apply migrations:
+
+```sh
+pnpm --filter web db:generate
+pnpm --filter web db:migrate
+```
+
+Generation uses `apps/web/drizzle.config.ts` and needs no connection or `DATABASE_URL`. Migration requires the URL
+and a running Postgres instance. Generated SQL and metadata live in `apps/web/lib/db/migrations/` and must be
+committed alongside schema changes. Until the first tables are added, there are no migrations to apply. Do not
+create placeholder product tables. Review migration safety for existing rows before applying SQL; do not use
+schema push as a substitute for reviewed migrations.
+
+To check connectivity from server code once Postgres is running:
+
+```ts
+import { sql } from "drizzle-orm";
+
+import { getDb } from "@/lib/db/client";
+
+await getDb().execute(sql`select 1`);
+```
+
 ## Components (shadcn / Base UI pattern)
 
 Follow the existing pattern in `packages/ui/src/components/button.tsx`:

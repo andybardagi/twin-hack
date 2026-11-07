@@ -32,7 +32,8 @@ apps/storybook ──►      │
 app/          → routes (App Router: layout.tsx, page.tsx) — thin: pages/layouts only, no business logic
 components/   → app-specific components grouped by feature/surface (e.g. theme-provider.tsx, query-provider.tsx)
 hooks/        → app-specific hooks
-lib/          → app-specific utilities
+lib/          → app-specific infrastructure and services
+  db/         → client.ts (lazy Drizzle/pg client), schema.ts (tables), migrations/ (generated SQL and metadata)
 src/helpers/  → shared helper functions/schemas used by multiple frontend components or by both frontend and backend
 tests/        → all *.test.ts / *.test.tsx files, mirroring the app/lib/src tree (see Testing layout below)
 ```
@@ -45,7 +46,26 @@ Keep `app/` route segments thin. Do not place route-private UI in `app/**/_compo
 
 `QueryProvider` (TanStack Query) lives next to `ThemeProvider` under `apps/web/components/`.
 
-Backend layout (API framework, DB, migrations) is undecided — see pending items in `feature_list.json`.
+### Database
+
+Postgres is the database. Drizzle ORM uses the `pg` driver; drizzle-kit generates and applies SQL migrations.
+Persistence stays app-local under `apps/web/lib/db/` until a second consumer appears. `apps/web/drizzle.config.ts`
+reads `lib/db/schema.ts` and writes generated SQL and metadata to `lib/db/migrations/`. No tables are defined yet,
+so there are no initial migrations. Commit generated migrations alongside future schema changes.
+
+Server code imports `getDb` from `@/lib/db/client`. Importing the module does not read `DATABASE_URL` or create a
+pool. The first `getDb()` call requires `DATABASE_URL` and caches a Drizzle client backed by a `pg.Pool` for that
+module instance; the pool opens connections on demand when queried. Keep this module out of Client Components
+and call `getDb()` at runtime, not at module scope or during prerendering. Building the app requires no database.
+
+The root `docker-compose.yml` runs Postgres 17 with a healthcheck, a named data volume, and port 5432 bound to
+localhost on host port 5433 to avoid conflicting with a database already using 5432. The connection URL and
+migration commands are documented in `docs/conventions.md`.
+
+Primary keys use UUIDv7 generated in app code before insert, with no database default on ID columns. The UUID
+dependency and ID helper will be added with the first consumer.
+
+The API framework remains undecided (feature 003); this foundation adds no API routes.
 
 ### apps/web testing layout
 
@@ -83,8 +103,7 @@ src/styles/       → globals.css (Tailwind v4 theme, design tokens)
 
 - Shared helper functions, schemas, and small pure utilities used by multiple app components or by both frontend and backend →
   `apps/web/src/helpers/`.
-- Persistence-backed, framework, service, adapter, database, and route-handler code stays in `apps/web/lib/` once a backend is chosen
-  (see pending items in `feature_list.json`).
+- Persistence-backed, framework, service, adapter, database, and route-handler code stays in `apps/web/lib/`.
 - Do not add `app/**/_lib` folders for shared helper code.
 
 ## Styling & theming
