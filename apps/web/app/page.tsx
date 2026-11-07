@@ -1,5 +1,8 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
+
+import { Button } from "@workspace/ui/components/button";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { getAuth } from "@/lib/auth";
@@ -31,6 +34,10 @@ export default async function Page() {
             Your wallet address couldn’t be found. Sign out and sign in again to retry.
           </p>
         )}
+        <Button render={<Link href="/orders/new" />}>New order</Button>
+        <Button variant="outline" render={<Link href="/settings" />}>
+          Settings
+        </Button>
         <SignOutButton />
       </section>
     </main>

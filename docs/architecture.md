@@ -10,8 +10,12 @@ apps/
   storybook                → @workspace/storybook — Storybook docs/preview for @workspace/ui (Vite builder)
 packages/
   ui                       → @workspace/ui — shared component library (shadcn-style, Base UI, Tailwind v4)
+  payments                 → @workspace/payments — PaymentRouter ABI, token list, EIP-712 helpers (viem)
   typescript-config        → @workspace/typescript-config — shared tsconfig presets
 ```
+
+`contracts/` (outside the pnpm workspace) is the Foundry project for `PaymentRouter`, with `forge-std` and
+`openzeppelin-contracts` as git submodules under `contracts/lib/`.
 
 ## Dependency direction
 
@@ -20,22 +24,34 @@ apps/web ────────► @workspace/ui ──► @base-ui/react, cva
 apps/storybook ──►      │
     │                   │
     └───────────────────┴──► @workspace/typescript-config (dev-only)
+
+apps/web ────────► @workspace/payments ──► viem
 ```
 
 - Apps depend on packages. **Packages never import from apps.**
-- `@workspace/ui` has no dependency on other workspace packages except the tsconfig preset.
-- Cross-package imports go through the `exports` map of `@workspace/ui` (`./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config`) — never deep-import via relative paths across packages.
+- `@workspace/ui` and `@workspace/payments` have no dependency on other workspace packages except the tsconfig preset.
+- Cross-package imports go through the `exports` map of `@workspace/ui` (`./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config`) or `@workspace/payments` (`./*` → `src/*.ts`, e.g. `@workspace/payments/abi`) — never deep-import via relative paths across packages.
+- `apps/web/next.config.ts` lists both packages in `transpilePackages`.
 
 ## apps/web layout
 
 ```
 app/          → routes (App Router: layout.tsx, page.tsx) — thin: pages/layouts only, no business logic
+  api/[[...slugs]]/route.ts → Elysia composition root (see Backend API)
 components/   → app-specific components grouped by feature/surface (e.g. theme-provider.tsx, query-provider.tsx)
+  auth/ orders/ settings/
 hooks/        → app-specific hooks
 lib/          → app-specific infrastructure and services
+  api/        → Elysia route module factories (orders-routes.ts, merchant-settings-routes.ts)
+  chain/      → chain config, RouterReader port and its viem adapter
   db/         → client.ts (lazy Drizzle/pg client), schema.ts (tables), migrations/ (generated SQL and metadata)
+  merchant-settings/ → MerchantSettingsRepository port and its Drizzle adapter
+  orders/     → OrderRepository port and its Drizzle adapter, signature check, settlement, pay page verification
+  session/    → SessionReader port and its better-auth adapter
+  signing-key/ → browser-only device signing key (IndexedDB, AES-GCM wrapping)
 src/helpers/  → shared helper functions/schemas used by multiple frontend components or by both frontend and backend
 tests/        → all *.test.ts / *.test.tsx files, mirroring the app/lib/src tree (see Testing layout below)
+  chain/      → fork tests, run separately with test:chain
 ```
 
 Path alias `@/*` resolves to the app root (see `apps/web/tsconfig.json`).
@@ -50,7 +66,17 @@ Keep `app/` route segments thin. Do not place route-private UI in `app/**/_compo
 
 Postgres is the database. Drizzle ORM uses the `pg` driver; drizzle-kit generates and applies SQL migrations.
 Persistence stays app-local under `apps/web/lib/db/` until a second consumer appears. `apps/web/drizzle.config.ts`
-reads `lib/db/schema.ts` and writes generated SQL and metadata to `lib/db/migrations/`. Auth tables and the initial migration are defined. Commit generated migrations alongside schema changes.
+reads `lib/db/schema.ts` and writes generated SQL and metadata to `lib/db/migrations/`. Commit generated migrations alongside schema changes.
+
+Tables: better-auth's auth tables (migration `0000`), `orders` (`0001`, extended in `0003`), and
+`merchant_settings` (`0002`).
+
+- `orders`: `id` (UUIDv7, also the on-chain `orderId`), `merchant_id` (FK `user.id`, on delete restrict),
+  `token_address` (checksummed), `amount` (`numeric(78,0)` base units, gross of fee), `merchant_address`,
+  `expires_at` (whole seconds, so it matches the signed `expiry`), `fee_bps`, `signature` (null until signed),
+  `settled_at` (null until a status poll sees the payment), `created_at`. Rows with no signature are reservations
+  and are never shown. Order status (open, expired, paid) derives from `expires_at` and `settled_at`.
+- `merchant_settings`: `merchant_id` (primary key, FK `user.id`, on delete cascade) and `default_token_address`.
 
 Server code imports `getDb` from `@/lib/db/client`. Importing the module does not read `DATABASE_URL` or create a
 pool. The first `getDb()` call requires `DATABASE_URL` and caches a Drizzle client backed by a `pg.Pool` for that
@@ -68,8 +94,7 @@ ID generator uses `uuid`'s `v7()` for all auth records.
 
 - `lib/auth.ts` lazily creates better-auth with the Drizzle adapter, anonymous SIWE plugin, and Next.js cookies
   integration. Environment validation and database initialization happen at runtime; builds need no env variables.
-- `app/api/auth/[...all]/route.ts` mounts better-auth's GET/POST handlers directly. The general backend API framework
-  remains undecided (feature 003 is pending); authentication does not select Elysia or add product endpoints.
+- `app/api/auth/[...all]/route.ts` mounts better-auth's GET/POST handlers directly, outside the Elysia app.
 - `lib/db/schema.ts` defines better-auth's user, session, account, verification, and wallet_address tables. Sessions
   retain the better-auth default lifetime. SIWE requests use Arbitrum's chain ID (42161). EOA signatures verify locally
   with viem. Only regular wallets are supported; smart wallets such as Safe cannot sign in. Malformed and
@@ -81,7 +106,61 @@ ID generator uses `uuid`'s `v7()` for all auth records.
   and redirects logged-out requests to `/sign-in`. No proxy is used. `lib/wallet-address.ts` fetches at most one primary
   wallet row using only the session user's ID. Missing addresses show a sign-out/retry message. Sign out invalidates
   the server session before navigating to `/sign-in`.
-- Contract calls and wallet views are deferred to a later PR.
+
+### Backend API
+
+Elysia is mounted in one composition root, `app/api/[[...slugs]]/route.ts`, with the `/api` prefix. It is the
+only file that wires route modules to adapters, exports `GET`, `POST` and `PUT` as `app.fetch`, and exports the
+`App` type. Route modules in `lib/api/` are factories that take ports as arguments. Each port in `lib/` has one
+adapter:
+
+| Port                                                                                   | Adapter                                               |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `OrderRepository` (`lib/orders/order-repository.ts`)                                   | `drizzleOrderRepository`                              |
+| `MerchantSettingsRepository` (`lib/merchant-settings/merchant-settings-repository.ts`) | `drizzleMerchantSettingsRepository`                   |
+| `SessionReader` (`lib/session/session-reader.ts`)                                      | `betterAuthSessionReader`                             |
+| `RouterReader` (`lib/chain/router-reader.ts`)                                          | `getRouterReader` (`lib/chain/viem-router-reader.ts`) |
+
+Routes:
+
+- `POST /api/orders`: reserves an order for the session's merchant (id, `expires_at` now + 15 minutes, `feeBps`
+  read from the router) and returns the fields to sign.
+- `POST /api/orders/:id/signature`: checks the signature against the merchant's on-chain `signingKeyOf` and
+  attaches it while the reservation is unsigned and unexpired.
+- `GET /api/orders/:id/status`: owner only. Reads `paid(merchant, orderId)`, writes `settled_at` once, and returns
+  `open`, `expired` or `paid`.
+- `GET` / `PUT /api/merchant-settings`: the session merchant's default receive token.
+
+Bodies are validated with Zod schemas from `src/helpers/`. Errors return `{ message }` with copy the merchant can
+act on; chain read failures return 503. Server Components that need the same data call the adapters directly.
+Client Components call the API through Eden (`lib/api-client.ts`).
+
+### Chain
+
+- Arbitrum One only. `lib/chain/chain-config.ts` defaults to the deployed `PaymentRouter`
+  (`0x4DE32c75eecDF3229114F105293698284b261Bb1`) and `https://arb1.arbitrum.io/rpc`. `PAYMENT_ROUTER_ADDRESS` and
+  `ARBITRUM_RPC_URL` override them at runtime; invalid overrides throw. Builds need neither.
+- `lib/chain/read-router.ts` turns a failed read into `null`, so callers report "try again" and never treat it as a
+  pass.
+- Contract writes (`setSigningKey`, `setPayoutAddress`) are sent from the merchant's wallet with wagmi on
+  `/settings`. The server never sends transactions.
+
+### Orders and signing key
+
+- `/settings`: signing key (register, rotate, revoke), forward address (read from and written to the router only),
+  and default receive token (`merchant_settings`).
+- Signing key: `lib/signing-key/` generates the key in the browser and stores it in IndexedDB, wrapped by a
+  non-extractable AES-GCM key. It never leaves the device. The router holds one key per merchant.
+- `/orders/new` loads the on-chain `signingKeyOf` and blocks the form, with a link to settings, unless it matches
+  this device's key. The device key signs the EIP-712 order (`signOrder` from `@workspace/payments/typed-data`)
+  with no wallet prompt.
+- `/orders/[id]`: owner only, 404 otherwise. Shows the amount, the QR linking to `/pay/order/<id>` (origin from
+  `BETTER_AUTH_URL`), and polls `/api/orders/:id/status` every 3 seconds while the order is open.
+- `/pay/order/[id]`: public. `lib/orders/pay-order.ts` verifies the stored signature against the on-chain key and
+  reads `paid`, then renders valid, invalid, expired, paid, or "try again" on RPC failure. The merchant address
+  never reaches the browser.
+- Tokens: `src/helpers/tokens.ts` derives the static list from `@workspace/payments/tokens` and adds a name,
+  `fiatDecimals` (2, or 0 for CHLt), and `canPay` / `canCollect`.
 
 ### apps/web testing layout
 
@@ -89,6 +168,10 @@ All test files live under `apps/web/tests/`, mirroring the `app/`, `lib/`, and `
 to source. Example: `apps/web/src/helpers/generate-id.ts` is tested at `apps/web/tests/src/helpers/generate-id.test.ts`.
 Vitest is configured in `apps/web/vitest.config.ts`. `*.integration.test.ts` files live in the same mirrored location
 as unit tests and use real Postgres. Run `pnpm test` after migrations; no integration tests are silently skipped.
+
+Chain tests live in `apps/web/tests/chain/` and are excluded from `pnpm test`. `pnpm --filter web test:chain`
+(`apps/web/vitest.chain.config.ts`) starts Anvil on an Arbitrum fork, deploys `PaymentRouter` from
+`contracts/out/`, and runs against it and real Postgres, one file at a time.
 
 ## apps/storybook layout
 
