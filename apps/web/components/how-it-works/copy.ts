@@ -123,6 +123,10 @@ const en = {
       sign: "Sign payment",
       paid: "Order paid",
       order: "Order #1042",
+      merchantPhone: "Merchant",
+      customerPhone: "Customer",
+      waitingScan: "Point the camera at the QR",
+      waitingPayment: "Waiting for payment",
     },
   },
   business: {
@@ -385,6 +389,10 @@ const es: typeof en = {
       sign: "Firmar pago",
       paid: "Orden pagada",
       order: "Orden n.º 1042",
+      merchantPhone: "Comercio",
+      customerPhone: "Cliente",
+      waitingScan: "Apunta la cámara al QR",
+      waitingPayment: "Esperando el pago",
     },
   },
   business: {
@@ -647,6 +655,10 @@ const pt: typeof en = {
       sign: "Assinar pagamento",
       paid: "Pedido pago",
       order: "Pedido nº 1042",
+      merchantPhone: "Comerciante",
+      customerPhone: "Cliente",
+      waitingScan: "Aponte a câmera para o QR",
+      waitingPayment: "Aguardando o pagamento",
     },
   },
   business: {
