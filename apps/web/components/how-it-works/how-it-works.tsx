@@ -39,6 +39,17 @@ function Section({
   );
 }
 
+const paymentRouterUrl = "https://arbiscan.io/address/0x4DE32c75eecDF3229114F105293698284b261Bb1";
+
+function AudienceCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <article className="space-y-4 rounded-xl border border-border bg-card p-6 text-card-foreground">
+      <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+      {children}
+    </article>
+  );
+}
+
 function HowItWorks({ locale }: { locale: Locale }) {
   const text = copy[locale];
 
@@ -64,9 +75,75 @@ function HowItWorks({ locale }: { locale: Locale }) {
             <HeroDiagram text={text.hero} />
           </section>
 
+          <Section title={text.problem.title}>
+            <div className="grid gap-6 md:grid-cols-2">
+              {[text.problem.customers, text.problem.merchants].map((side) => (
+                <AudienceCard key={side.title} title={side.title}>
+                  <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
+                    {side.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </AudienceCard>
+              ))}
+            </div>
+          </Section>
+
+          <Section title={text.solution.title} lede={text.solution.lede}>
+            <div className="grid gap-6 md:grid-cols-2">
+              {[text.solution.customers, text.solution.merchants].map((side) => (
+                <AudienceCard key={side.title} title={side.title}>
+                  <dl className="space-y-4">
+                    {side.items.map((item) => (
+                      <div key={item.title} className="space-y-1">
+                        <dt className="font-medium">{item.title}</dt>
+                        <dd className="text-sm text-muted-foreground">{item.body}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </AudienceCard>
+              ))}
+            </div>
+          </Section>
+
           <Section title={text.steps.title} lede={text.steps.lede}>
             <PaymentSteps text={text.steps} />
             <p className="text-xs text-muted-foreground">{text.steps.disclaimer}</p>
+          </Section>
+
+          <Section title={text.business.title} lede={text.business.lede}>
+            <ul className="grid gap-6 md:grid-cols-3">
+              {text.business.items.map((item) => (
+                <li
+                  key={item.title}
+                  className="space-y-2 rounded-xl border border-border bg-card p-6 text-card-foreground"
+                >
+                  <p className="text-xs font-medium text-muted-foreground">{item.who}</p>
+                  <p className="text-3xl font-semibold tracking-tight">{item.value}</p>
+                  <h3 className="font-medium">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.body}</p>
+                </li>
+              ))}
+            </ul>
+            <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
+              {text.business.points.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section title={text.distribution.title} lede={text.distribution.lede}>
+            <ul className="grid gap-6 md:grid-cols-3">
+              {text.distribution.items.map((item) => (
+                <li
+                  key={item.title}
+                  className="space-y-2 rounded-xl border border-border bg-card p-6 text-card-foreground"
+                >
+                  <h3 className="font-medium">{item.title}</h3>
+                  <p className="text-sm text-muted-foreground">{item.body}</p>
+                </li>
+              ))}
+            </ul>
           </Section>
 
           <Section title={text.routing.title} lede={text.routing.lede}>
@@ -105,22 +182,6 @@ function HowItWorks({ locale }: { locale: Locale }) {
             </dl>
           </Section>
 
-          <Section title={text.costs.title} lede={text.costs.lede}>
-            <ul className="grid gap-6 md:grid-cols-3">
-              {text.costs.items.map((item) => (
-                <li
-                  key={item.title}
-                  className="space-y-2 rounded-xl border border-border bg-card p-6 text-card-foreground"
-                >
-                  <p className="text-xs font-medium text-muted-foreground">{item.who}</p>
-                  <p className="text-3xl font-semibold tracking-tight">{item.value}</p>
-                  <h3 className="font-medium">{item.title}</h3>
-                  <p className="text-sm text-muted-foreground">{item.body}</p>
-                </li>
-              ))}
-            </ul>
-          </Section>
-
           <Section title={text.faq.title} centered>
             <Accordion className="mx-auto max-w-2xl">
               {text.faq.items.map((item) => (
@@ -139,6 +200,14 @@ function HowItWorks({ locale }: { locale: Locale }) {
             <Link href="/sign-in" className={buttonVariants({ size: "lg" })}>
               {text.cta.action}
             </Link>
+            <a
+              href={paymentRouterUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ variant: "link" })}
+            >
+              {text.cta.contract}
+            </a>
           </section>
         </main>
       </div>
