@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { cn } from "@workspace/ui/lib/utils";
 import { CheckIcon } from "@/components/how-it-works/icons";
@@ -151,21 +151,37 @@ function PaymentSteps({ text }: { text: Copy["steps"] }) {
     },
   ];
   const [stage, setStage] = useState(0);
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsVisible(entry?.isIntersecting ?? false),
+      { threshold: 0.5 },
+    );
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const timeout = window.setTimeout(
       () => setStage((current) => (current + 1) % steps.length),
       stepDurationMs,
     );
     return () => window.clearTimeout(timeout);
-  }, [stage, steps.length]);
+  }, [isVisible, stage, steps.length]);
 
   const step = steps[stage];
   if (!step) throw new Error(`Unknown payment step: ${stage}`);
 
   return (
-    <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div
+      ref={containerRef}
+      className="grid items-center gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]"
+    >
       <div className="grid grid-cols-2 gap-3 sm:gap-6">
         <Phone label={mock.merchantPhone} stage={stage}>
           {step.merchantScreen}
