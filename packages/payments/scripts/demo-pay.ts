@@ -2,10 +2,9 @@ import { parseArgs } from "node:util";
 import {
   createPublicClient,
   createWalletClient,
-  erc20Abi,
+  formatEther,
   formatUnits,
   http,
-  isAddress,
   isAddressEqual,
   isHex,
   parseUnits,
@@ -17,7 +16,9 @@ import { privateKeyToAccount } from "viem/accounts";
 import { arbitrum } from "viem/chains";
 
 import { paymentRouterAbi } from "../src/abi";
+import { approveTwin, twinApprovalStatus } from "../src/approval";
 import { assertNever } from "../src/assert-never";
+import { paymentRouterAddress as router } from "../src/deployment";
 import { submitPayment } from "../src/pay";
 import { quote } from "../src/quote";
 import { isTokenSymbol, tokens, type TokenSymbol } from "../src/tokens";
@@ -40,12 +41,6 @@ function privateKeyEnv(name: string) {
   return privateKeyToAccount(value);
 }
 
-function addressEnv(name: string) {
-  const value = requireEnv(name);
-  if (!isAddress(value)) throw new Error(`${name} must be an address`);
-  return value;
-}
-
 function tokenArg(name: string, value: string | undefined): TokenSymbol {
   if (value === undefined || !isTokenSymbol(value)) {
     throw new Error(`--${name} must be one of ${Object.keys(tokens).join(", ")}\n${USAGE}`);
@@ -64,7 +59,6 @@ if (values.amount === undefined || !/^\d+(\.\d+)?$/.test(values.amount)) {
 const receiveAmount = parseUnits(values.amount, tokens[receiveToken].decimals);
 if (receiveAmount === 0n) throw new Error("--amount must be greater than zero");
 
-const router = addressEnv("PAYMENT_ROUTER_ADDRESS");
 const transport = http(process.env.ARBITRUM_RPC_URL ?? "https://arb1.arbitrum.io/rpc");
 const publicClient = createPublicClient({ chain: arbitrum, transport });
 const walletFor = (envName: string) =>
@@ -110,20 +104,24 @@ async function authorizePayment() {
         deadline,
       });
     case "twin": {
-      const allowance = await publicClient.readContract({
-        address: pay.address,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [customer.account.address, router],
+      const approval = await twinApprovalStatus(publicClient, {
+        payer: customer.account.address,
+        token: pay,
+        router,
+        maxPayAmount: quoted.maxPayAmount,
       });
-      if (allowance < quoted.maxPayAmount) {
-        const hash = await customer.writeContract({
-          address: pay.address,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [router, quoted.maxPayAmount],
-        });
-        await confirm(hash, "approve");
+      switch (approval.kind) {
+        case "approved":
+          break;
+        case "needs-approval":
+          await approveTwin(customer, publicClient, { token: pay, router });
+          break;
+        case "insufficient-eth":
+          throw new Error(
+            `Customer needs ~${formatEther(approval.gasCost)} ETH for the one-time ${payToken} approve but has ${formatEther(approval.ethBalance)} ETH`,
+          );
+        default:
+          assertNever(approval);
       }
       return noPermit;
     }

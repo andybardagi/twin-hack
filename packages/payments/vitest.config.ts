@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     // Fork tests pull state from a remote RPC on first touch.
+    // One fork at a time: parallel anvil forks trip the public Arbitrum RPC's rate limit.
+    fileParallelism: false,
     testTimeout: 120_000,
     hookTimeout: 180_000,
   },

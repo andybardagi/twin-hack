@@ -4,6 +4,8 @@ type Token =
   | { kind: "usdt0"; address: Address; decimals: 6 }
   | { kind: "twin"; address: Address; decimals: 18; pool: Address };
 
+export type TwinToken = Extract<Token, { kind: "twin" }>;
+
 /** Arbitrum One tokens the PaymentRouter settles. Twin pools are Curve Twocrypto with coins (Twin, USDT0). */
 export const tokens = {
   USDT0: { kind: "usdt0", address: "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9", decimals: 6 },

@@ -1,24 +1,4 @@
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { createServer } from "node:net";
-import { setTimeout as sleep } from "node:timers/promises";
-import {
-  createPublicClient,
-  createTestClient,
-  createWalletClient,
-  erc20Abi,
-  http,
-  isHex,
-  keccak256,
-  maxUint256,
-  parseEther,
-  parseUnits,
-  toHex,
-  type Address,
-  type PublicClient,
-  type Transport,
-} from "viem";
-import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
+import { erc20Abi, keccak256, maxUint256, parseUnits, toHex, type Address } from "viem";
 import { arbitrum } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -34,151 +14,46 @@ import {
   signUsdt0Permit,
   type RouterDomain,
 } from "../src/typed-data";
+import {
+  customer,
+  FEE_BPS,
+  merchant,
+  merchantSigner,
+  owner,
+  startArbitrumFork,
+  type ArbitrumFork,
+} from "./arbitrum-fork";
 
-const RPC_URL = process.env.ARBITRUM_RPC_URL ?? "https://arb1.arbitrum.io/rpc";
-const FEE_BPS = 50;
 const ORDER_TTL_SECONDS = 600n;
 const RECEIVE_AMOUNT = parseUnits("15000", tokens.ARGt.decimals);
 
 type Authorization = "permit" | "approve";
 
-const contractsDir = new URL("../../../contracts/", import.meta.url).pathname;
-const artifactPath = `${contractsDir}out/PaymentRouter.sol/PaymentRouter.json`;
-
-// Anvil's default accounts carry EIP-7702 delegations on Arbitrum, which break USDT0 permits, so use fresh keys.
-const testAccount = (label: string) =>
-  privateKeyToAccount(keccak256(toHex(`payments-test-${label}`)));
-const owner = testAccount("owner");
-const merchant = testAccount("merchant");
-const merchantSigner = testAccount("merchant-signer");
-const customer = testAccount("customer");
-
-function readRouterBytecode() {
-  if (!existsSync(artifactPath))
-    execFileSync("forge", ["build"], { cwd: contractsDir, stdio: "inherit" });
-  const artifact: unknown = JSON.parse(readFileSync(artifactPath, "utf8"));
-  if (
-    typeof artifact !== "object" ||
-    artifact === null ||
-    !("bytecode" in artifact) ||
-    typeof artifact.bytecode !== "object" ||
-    artifact.bytecode === null ||
-    !("object" in artifact.bytecode) ||
-    !isHex(artifact.bytecode.object)
-  ) {
-    throw new Error(`No bytecode in ${artifactPath}`);
-  }
-  return artifact.bytecode.object;
-}
-
-function freePort() {
-  return new Promise<number>((resolve, reject) => {
-    const server = createServer();
-    server.once("error", reject);
-    server.listen(0, () => {
-      const address = server.address();
-      if (address === null || typeof address === "string")
-        return reject(new Error("No TCP port assigned"));
-      server.close(() => resolve(address.port));
-    });
-  });
-}
-
-async function waitForRpc(publicClient: PublicClient, anvil: ChildProcess) {
-  for (let attempt = 0; attempt < 120; attempt++) {
-    if (anvil.exitCode !== null) throw new Error(`anvil exited with code ${anvil.exitCode}`);
-    const ready = await publicClient.getChainId().then(
-      () => true,
-      () => false,
-    );
-    if (ready) return;
-    await sleep(500);
-  }
-  throw new Error("anvil did not start in time");
-}
-
 describe("PaymentRouter SDK on an Arbitrum fork", () => {
-  let anvil: ChildProcess;
-  let publicClient: PublicClient;
+  let fork: ArbitrumFork;
   let domain: RouterDomain;
-  let transport: Transport;
-  const walletFor = (account: PrivateKeyAccount) =>
-    createWalletClient({ account, chain: arbitrum, transport });
 
   beforeAll(async () => {
-    const port = await freePort();
-    // Forks the latest block unless FORK_BLOCK is set (needs an archive RPC for older blocks).
-    const forkBlock = process.env.FORK_BLOCK;
-    anvil = spawn("anvil", [
-      "--fork-url",
-      RPC_URL,
-      ...(forkBlock ? ["--fork-block-number", forkBlock] : []),
-      "--port",
-      String(port),
-      "--silent",
-    ]);
-    transport = http(`http://127.0.0.1:${port}`);
-    publicClient = createPublicClient({ chain: arbitrum, transport });
-    await waitForRpc(publicClient, anvil);
-
-    const testClient = createTestClient({ chain: arbitrum, mode: "anvil", transport });
-    for (const account of [owner, merchant, customer]) {
-      await testClient.setBalance({ address: account.address, value: parseEther("1") });
-    }
-    const twinTokens = Object.values(tokens).flatMap((token) =>
-      token.kind === "twin" ? [token] : [],
+    fork = await startArbitrumFork();
+    domain = { chainId: arbitrum.id, router: fork.router };
+    await fork.fundCustomer(
+      tokens.USDT0.address,
+      tokens.ARGt.pool,
+      parseUnits("20", tokens.USDT0.decimals),
     );
-    const deployHash = await walletFor(owner).deployContract({
-      abi: paymentRouterAbi,
-      bytecode: readRouterBytecode(),
-      args: [
-        owner.address,
-        owner.address,
-        FEE_BPS,
-        tokens.USDT0.address,
-        twinTokens.map((token) => token.address),
-        twinTokens.map((token) => token.pool),
-      ],
-    });
-    const { contractAddress } = await publicClient.waitForTransactionReceipt({ hash: deployHash });
-    if (!contractAddress) throw new Error("Router deployment returned no address");
-    domain = { chainId: arbitrum.id, router: contractAddress };
-
-    await publicClient.waitForTransactionReceipt({
-      hash: await walletFor(merchant).writeContract({
-        address: contractAddress,
-        abi: paymentRouterAbi,
-        functionName: "setSigningKey",
-        args: [merchantSigner.address],
-      }),
-    });
-
-    const fund = async (token: Address, holder: Address, amount: bigint) => {
-      await testClient.impersonateAccount({ address: holder });
-      await testClient.setBalance({ address: holder, value: parseEther("1") });
-      const hash = await createWalletClient({
-        account: holder,
-        chain: arbitrum,
-        transport,
-      }).writeContract({
-        address: token,
-        abi: erc20Abi,
-        functionName: "transfer",
-        args: [customer.address, amount],
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-      await testClient.stopImpersonatingAccount({ address: holder });
-    };
-    await fund(tokens.USDT0.address, tokens.ARGt.pool, parseUnits("20", tokens.USDT0.decimals));
-    await fund(tokens.BRAt.address, tokens.BRAt.pool, parseUnits("1000", tokens.BRAt.decimals));
+    await fork.fundCustomer(
+      tokens.BRAt.address,
+      tokens.BRAt.pool,
+      parseUnits("1000", tokens.BRAt.decimals),
+    );
   });
 
   afterAll(() => {
-    anvil?.kill();
+    fork?.stop();
   });
 
   const balanceOf = (token: Address, owner: Address) =>
-    publicClient.readContract({
+    fork.publicClient.readContract({
       address: token,
       abi: erc20Abi,
       functionName: "balanceOf",
@@ -193,14 +68,14 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
   ) {
     switch (authorization) {
       case "permit":
-        return signUsdt0Permit(walletFor(customer), publicClient, {
+        return signUsdt0Permit(fork.walletFor(customer), fork.publicClient, {
           ...domain,
           value: maxPayAmount,
           deadline,
         });
       case "approve":
-        await publicClient.waitForTransactionReceipt({
-          hash: await walletFor(customer).writeContract({
+        await fork.publicClient.waitForTransactionReceipt({
+          hash: await fork.walletFor(customer).writeContract({
             address: tokens[payToken].address,
             abi: erc20Abi,
             functionName: "approve",
@@ -220,19 +95,19 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
   ) {
     const receiveToken = tokens.ARGt.address;
     const payTokenAddress = tokens[payToken].address;
-    const quoted = await quote(publicClient, {
+    const quoted = await quote(fork.publicClient, {
       payToken,
       receiveToken: "ARGt",
       receiveAmount: RECEIVE_AMOUNT,
     });
-    const { timestamp } = await publicClient.getBlock();
+    const { timestamp } = await fork.publicClient.getBlock();
     const order = {
       merchant: merchant.address,
       receiveToken,
       receiveAmount: RECEIVE_AMOUNT,
       orderId: keccak256(toHex(orderLabel)),
       expiry: timestamp + ORDER_TTL_SECONDS,
-      feeBps: await publicClient.readContract({
+      feeBps: await fork.publicClient.readContract({
         address: domain.router,
         abi: paymentRouterAbi,
         functionName: "feeBps",
@@ -253,12 +128,12 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
     const payerBefore = await balanceOf(payTokenAddress, customer.address);
     const merchantBefore = await balanceOf(receiveToken, merchant.address);
 
-    const { settled } = await submitPayment(walletFor(owner), publicClient, {
+    const { settled } = await submitPayment(fork.walletFor(owner), fork.publicClient, {
       router: domain.router,
       order,
-      merchantSignature: await signOrder(walletFor(merchantSigner), domain, order),
+      merchantSignature: await signOrder(fork.walletFor(merchantSigner), domain, order),
       intent,
-      payerSignature: await signIntent(walletFor(customer), domain, intent),
+      payerSignature: await signIntent(fork.walletFor(customer), domain, intent),
       permit,
     });
 
@@ -276,7 +151,7 @@ describe("PaymentRouter SDK on an Arbitrum fork", () => {
   }
 
   it("settles USDT0 -> ARGt with a permit and no prior approval", async () => {
-    const allowance = await publicClient.readContract({
+    const allowance = await fork.publicClient.readContract({
       address: tokens.USDT0.address,
       abi: erc20Abi,
       functionName: "allowance",
