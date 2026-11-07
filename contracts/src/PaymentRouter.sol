@@ -10,6 +10,8 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 interface ICurveTwocrypto {
     function coins(uint256 index) external view returns (address);
+    function get_dx(uint256 i, uint256 j, uint256 dy) external view returns (uint256);
+    function exchange(uint256 i, uint256 j, uint256 dx, uint256 minDy) external returns (uint256);
 }
 
 /// @notice Settles merchant-signed QR orders paid with a customer-signed intent, routing Twin tokens through
@@ -48,6 +50,8 @@ contract PaymentRouter is EIP712, Ownable2Step {
 
     uint16 public constant MAX_FEE_BPS = 200;
     uint16 public constant BPS_DENOMINATOR = 10_000;
+    /// @dev Curve's get_dx lands slightly under the target dy, so quotes are padded before swapping.
+    uint16 public constant GET_DX_BUFFER_BPS = 2;
     uint256 private constant TWIN_COIN_INDEX = 0;
     uint256 private constant USDT0_COIN_INDEX = 1;
 
@@ -88,7 +92,7 @@ contract PaymentRouter is EIP712, Ownable2Step {
     error OrderExpired();
     error OrderAlreadyPaid();
     error UnsupportedToken(address token);
-    error UnsupportedRoute();
+    error InvalidPayout();
     error MaxPayExceeded();
 
     constructor(
@@ -116,6 +120,7 @@ contract PaymentRouter is EIP712, Ownable2Step {
 
     /// @param payout Where settlements go; address(0) pays the merchant address itself.
     function setPayoutAddress(address payout) external {
+        if (payout == address(this)) revert InvalidPayout();
         payoutAddressOf[msg.sender] = payout;
         emit PayoutAddressSet(msg.sender, payout);
     }
@@ -177,8 +182,10 @@ contract PaymentRouter is EIP712, Ownable2Step {
     }
 
     function _settle(Order calldata order, Intent calldata intent) private {
+        uint256 receiveBalanceBefore = IERC20(order.receiveToken).balanceOf(address(this));
         uint256 payAmount = _collect(order, intent);
-        (uint256 fee, address payout) = _distribute(order);
+        uint256 received = IERC20(order.receiveToken).balanceOf(address(this)) - receiveBalanceBefore;
+        (uint256 fee, address payout) = _distribute(order, received);
         emit PaymentSettled(
             order.merchant,
             order.orderId,
@@ -192,20 +199,48 @@ contract PaymentRouter is EIP712, Ownable2Step {
         );
     }
 
-    /// @dev Pulls the payer's tokens and leaves exactly `order.receiveAmount` of `receiveToken` in this contract.
+    /// @dev Pulls exactly what the route needs from the payer and swaps it into at least `order.receiveAmount`.
     function _collect(Order calldata order, Intent calldata intent) private returns (uint256 payAmount) {
-        if (intent.payToken != order.receiveToken) revert UnsupportedRoute();
-        payAmount = order.receiveAmount;
-        if (payAmount > intent.maxPayAmount) revert MaxPayExceeded();
-        IERC20(intent.payToken).safeTransferFrom(intent.payer, address(this), payAmount);
+        if (intent.payToken == order.receiveToken) {
+            payAmount = order.receiveAmount;
+            _pull(intent, payAmount);
+            return payAmount;
+        }
+
+        // USDT0 has no pool, so a zero pool marks the USDT0 side of the route.
+        address payPool = poolOf[intent.payToken];
+        address receivePool = poolOf[order.receiveToken];
+        uint256 usdt0Needed = receivePool == address(0)
+            ? order.receiveAmount
+            : _quote(receivePool, USDT0_COIN_INDEX, TWIN_COIN_INDEX, order.receiveAmount);
+        payAmount =
+            payPool == address(0) ? usdt0Needed : _quote(payPool, TWIN_COIN_INDEX, USDT0_COIN_INDEX, usdt0Needed);
+        _pull(intent, payAmount);
+
+        uint256 usdt0Amount = payPool == address(0)
+            ? payAmount
+            : ICurveTwocrypto(payPool).exchange(TWIN_COIN_INDEX, USDT0_COIN_INDEX, payAmount, usdt0Needed);
+        if (receivePool != address(0)) {
+            ICurveTwocrypto(receivePool).exchange(USDT0_COIN_INDEX, TWIN_COIN_INDEX, usdt0Amount, order.receiveAmount);
+        }
     }
 
-    function _distribute(Order calldata order) private returns (uint256 fee, address payout) {
+    function _pull(Intent calldata intent, uint256 amount) private {
+        if (amount > intent.maxPayAmount) revert MaxPayExceeded();
+        IERC20(intent.payToken).safeTransferFrom(intent.payer, address(this), amount);
+    }
+
+    function _quote(address pool, uint256 i, uint256 j, uint256 dy) private view returns (uint256) {
+        return ICurveTwocrypto(pool).get_dx(i, j, dy) * (BPS_DENOMINATOR + GET_DX_BUFFER_BPS) / BPS_DENOMINATOR;
+    }
+
+    /// @dev Swap surplus above `receiveAmount` goes to the treasury with the fee so the router keeps nothing.
+    function _distribute(Order calldata order, uint256 received) private returns (uint256 fee, address payout) {
         fee = order.receiveAmount * feeBps / BPS_DENOMINATOR;
         payout = payoutAddressOf[order.merchant];
         if (payout == address(0)) payout = order.merchant;
         IERC20 receiveToken = IERC20(order.receiveToken);
-        receiveToken.safeTransfer(treasury, fee);
+        receiveToken.safeTransfer(treasury, received - order.receiveAmount + fee);
         receiveToken.safeTransfer(payout, order.receiveAmount - fee);
     }
 

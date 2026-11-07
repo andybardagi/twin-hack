@@ -4,7 +4,9 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {PaymentRouter} from "../src/PaymentRouter.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {ICurveTwocrypto, PaymentRouter} from "../src/PaymentRouter.sol";
 
 contract PaymentRouterTest is Test {
     uint256 constant FORK_BLOCK = 522_117_000;
@@ -15,10 +17,16 @@ contract PaymentRouterTest is Test {
     address constant ARGT_POOL = 0x356D349dA9ADd7Efb56a35fAB939A2c6D852f853;
     IERC20 constant BRAT = IERC20(0xC4ed6Aba5373D78E160F4df39e011F078Be54df8);
     address constant BRAT_POOL = 0xEef48Df5F1c509cD9730774b4e8A4464626ef8D5;
+    IERC20 constant COLT = IERC20(0xa16d5DB80A45157E0e451750B81FF0CC0b61d558);
+    address constant COLT_POOL = 0x7D2dFfa9e903b8377c96196dA424C7965b06BCc3;
+    bytes32 constant PERMIT_TYPEHASH =
+        keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
 
     uint16 constant FEE_BPS = 50;
-    uint256 constant USDT0_AMOUNT = 20e6;
-    uint256 constant ARGT_AMOUNT = 25_000e18;
+    uint256 constant USDT0_AMOUNT = 1e6;
+    uint256 constant ARGT_AMOUNT = 15_000e18;
+    uint256 constant BRAT_FUNDING = 1_000e18;
+    uint256 constant MAX_PAY_SLIPPAGE_BPS = 100;
     uint64 constant ORDER_TTL = 10 minutes;
 
     PaymentRouter router;
@@ -36,10 +44,12 @@ contract PaymentRouterTest is Test {
         (merchantKey, merchantKeyPk) = makeAddrAndKey("merchantKey");
         (payer, payerPk) = makeAddrAndKey("payer");
 
-        address[] memory tokens = new address[](1);
-        address[] memory pools = new address[](1);
+        address[] memory tokens = new address[](2);
+        address[] memory pools = new address[](2);
         tokens[0] = address(ARGT);
         pools[0] = ARGT_POOL;
+        tokens[1] = address(BRAT);
+        pools[1] = BRAT_POOL;
         // Salted so the router doesn't land on the default test-deploy address, which holds dust on mainnet.
         router = new PaymentRouter{salt: keccak256("PaymentRouter")}(owner, treasury, FEE_BPS, USDT0, tokens, pools);
 
@@ -48,9 +58,11 @@ contract PaymentRouterTest is Test {
 
         _fund(USDT0, ARGT_POOL, payer, USDT0_AMOUNT * 10);
         _fund(ARGT, ARGT_POOL, payer, ARGT_AMOUNT * 10);
+        _fund(BRAT, BRAT_POOL, payer, BRAT_FUNDING);
         vm.startPrank(payer);
         USDT0.approve(address(router), type(uint256).max);
         ARGT.approve(address(router), type(uint256).max);
+        BRAT.approve(address(router), type(uint256).max);
         vm.stopPrank();
     }
 
@@ -125,6 +137,74 @@ contract PaymentRouterTest is Test {
         assertEq(token.balanceOf(expectedPayout), payoutBefore + amount - fee);
         assertEq(token.balanceOf(address(router)), 0);
         assertTrue(router.paid(merchant, order.orderId));
+    }
+
+    struct Balances {
+        uint256 payerPayToken;
+        uint256 merchantReceiveToken;
+        uint256 treasuryReceiveToken;
+    }
+
+    function _withSlippage(uint256 amount) internal pure returns (uint256) {
+        return amount * (10_000 + MAX_PAY_SLIPPAGE_BPS) / 10_000;
+    }
+
+    function _signPermit(uint256 value) internal view returns (PaymentRouter.PermitData memory permit) {
+        IERC20Permit usdt0Permit = IERC20Permit(address(USDT0));
+        permit.value = value;
+        permit.deadline = block.timestamp + ORDER_TTL;
+        bytes32 structHash = keccak256(
+            abi.encode(PERMIT_TYPEHASH, payer, address(router), value, usdt0Permit.nonces(payer), permit.deadline)
+        );
+        (permit.v, permit.r, permit.s) =
+            vm.sign(payerPk, keccak256(abi.encodePacked("\x19\x01", usdt0Permit.DOMAIN_SEPARATOR(), structHash)));
+    }
+
+    function _balances(IERC20 payToken, IERC20 receiveToken) internal view returns (Balances memory) {
+        return Balances({
+            payerPayToken: payToken.balanceOf(payer),
+            merchantReceiveToken: receiveToken.balanceOf(merchant),
+            treasuryReceiveToken: receiveToken.balanceOf(treasury)
+        });
+    }
+
+    function _settledPayAmount() internal returns (uint256 payAmount) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].emitter == address(router) && logs[i].topics[0] == PaymentRouter.PaymentSettled.selector) {
+                (, payAmount) = abi.decode(logs[i].data, (address, uint256));
+                return payAmount;
+            }
+        }
+        revert("PaymentSettled not emitted");
+    }
+
+    function _assertSwapSettles(
+        IERC20 payToken,
+        IERC20 receiveToken,
+        uint256 receiveAmount,
+        uint256 maxPay,
+        PaymentRouter.PermitData memory permit
+    ) internal {
+        PaymentRouter.Order memory order = _order(receiveToken, receiveAmount, keccak256("order-1"));
+        PaymentRouter.Intent memory intent = _intent(order, payToken, maxPay);
+        bytes memory merchantSig = _sign(merchantKeyPk, router.hashOrder(order));
+        bytes memory payerSig = _sign(payerPk, router.hashIntent(intent));
+        Balances memory before = _balances(payToken, receiveToken);
+
+        vm.recordLogs();
+        router.pay(order, merchantSig, intent, payerSig, permit);
+        uint256 payAmount = _settledPayAmount();
+
+        Balances memory afterPay = _balances(payToken, receiveToken);
+        uint256 fee = receiveAmount * FEE_BPS / 10_000;
+        assertEq(afterPay.merchantReceiveToken - before.merchantReceiveToken, receiveAmount - fee);
+        assertGe(afterPay.treasuryReceiveToken - before.treasuryReceiveToken, fee);
+        assertEq(before.payerPayToken - afterPay.payerPayToken, payAmount);
+        assertLe(payAmount, maxPay);
+        assertEq(payToken.balanceOf(address(router)), 0);
+        assertEq(receiveToken.balanceOf(address(router)), 0);
+        assertEq(USDT0.balanceOf(address(router)), 0);
     }
 
     function test_settlesUsdt0ToMerchant() public {
@@ -224,11 +304,55 @@ contract PaymentRouterTest is Test {
         );
     }
 
-    function test_revertsCrossTokenRouteUntilSwapsExist() public {
+    function test_revertsWhenMaxPayBelowSwapQuote() public {
+        PaymentRouter.Order memory order = _order(ARGT, ARGT_AMOUNT, keccak256("order-1"));
+        uint256 unbufferedQuote = ICurveTwocrypto(ARGT_POOL).get_dx(1, 0, ARGT_AMOUNT);
+        _payExpectRevert(
+            order, _intent(order, USDT0, unbufferedQuote), abi.encodeWithSelector(PaymentRouter.MaxPayExceeded.selector)
+        );
+    }
+
+    function test_revertsUnsupportedPayToken() public {
         PaymentRouter.Order memory order = _order(USDT0, USDT0_AMOUNT, keccak256("order-1"));
         _payExpectRevert(
-            order, _intent(order, ARGT, ARGT_AMOUNT), abi.encodeWithSelector(PaymentRouter.UnsupportedRoute.selector)
+            order,
+            _intent(order, COLT, ARGT_AMOUNT),
+            abi.encodeWithSelector(PaymentRouter.UnsupportedToken.selector, address(COLT))
         );
+    }
+
+    function test_rejectsRouterAsPayout() public {
+        vm.prank(merchant);
+        vm.expectRevert(PaymentRouter.InvalidPayout.selector);
+        router.setPayoutAddress(address(router));
+    }
+
+    function test_settlesUsdt0ToArgtWithPermit() public {
+        vm.prank(payer);
+        USDT0.approve(address(router), 0);
+        uint256 maxPay = _withSlippage(ICurveTwocrypto(ARGT_POOL).get_dx(1, 0, ARGT_AMOUNT));
+        _assertSwapSettles(USDT0, ARGT, ARGT_AMOUNT, maxPay, _signPermit(maxPay));
+    }
+
+    function test_settlesWhenPermitWasFrontRun() public {
+        vm.prank(payer);
+        USDT0.approve(address(router), 0);
+        uint256 maxPay = _withSlippage(ICurveTwocrypto(ARGT_POOL).get_dx(1, 0, ARGT_AMOUNT));
+        PaymentRouter.PermitData memory permit = _signPermit(maxPay);
+        IERC20Permit(address(USDT0))
+            .permit(payer, address(router), permit.value, permit.deadline, permit.v, permit.r, permit.s);
+        _assertSwapSettles(USDT0, ARGT, ARGT_AMOUNT, maxPay, permit);
+    }
+
+    function test_settlesArgtToUsdt0() public {
+        uint256 maxPay = _withSlippage(ICurveTwocrypto(ARGT_POOL).get_dx(0, 1, USDT0_AMOUNT));
+        _assertSwapSettles(ARGT, USDT0, USDT0_AMOUNT, maxPay, _noPermit());
+    }
+
+    function test_settlesBratToArgtInTwoHops() public {
+        uint256 usdt0Needed = ICurveTwocrypto(ARGT_POOL).get_dx(1, 0, ARGT_AMOUNT);
+        uint256 maxPay = _withSlippage(ICurveTwocrypto(BRAT_POOL).get_dx(0, 1, _withSlippage(usdt0Needed)));
+        _assertSwapSettles(BRAT, ARGT, ARGT_AMOUNT, maxPay, _noPermit());
     }
 
     function test_feeCapEnforced() public {
@@ -261,14 +385,14 @@ contract PaymentRouterTest is Test {
 
     function test_setPoolMovesApprovals() public {
         vm.startPrank(owner);
-        router.setPool(address(BRAT), BRAT_POOL);
-        assertEq(BRAT.allowance(address(router), BRAT_POOL), type(uint256).max);
-        assertEq(USDT0.allowance(address(router), BRAT_POOL), type(uint256).max);
+        router.setPool(address(COLT), COLT_POOL);
+        assertEq(COLT.allowance(address(router), COLT_POOL), type(uint256).max);
+        assertEq(USDT0.allowance(address(router), COLT_POOL), type(uint256).max);
 
-        router.setPool(address(BRAT), address(0));
+        router.setPool(address(COLT), address(0));
         vm.stopPrank();
-        assertEq(BRAT.allowance(address(router), BRAT_POOL), 0);
-        assertEq(USDT0.allowance(address(router), BRAT_POOL), 0);
+        assertEq(COLT.allowance(address(router), COLT_POOL), 0);
+        assertEq(USDT0.allowance(address(router), COLT_POOL), 0);
         assertEq(USDT0.allowance(address(router), ARGT_POOL), type(uint256).max);
     }
 
