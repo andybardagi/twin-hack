@@ -110,13 +110,13 @@ Follow the existing pattern in `packages/ui/src/components/button.tsx`:
 - Set `data-slot="<component-name>"` on the rendered element.
 - Plain `function` declarations for components (no `React.FC`, no `forwardRef` unless a ref is actually consumed).
 - Spread `...props` last; accept `className` and merge it via `cn()`.
-- **Every component added to `packages/ui/src/components/` must have a matching story** in `apps/storybook/stories/<component>.stories.tsx` — the `reviewer` checks for this pairing before approving.
+- **Every component added to `packages/ui/src/components/` must have a matching story** in `apps/storybook/stories/<component>.stories.tsx`.
 
 ## Files & naming
 
 - One component per file, **kebab-case filenames** (`theme-provider.tsx`, `button.tsx`); PascalCase component names.
 - Hooks in `hooks/`, prefixed `use`. App-specific UI components in `components/<area>/`, not `app/**/_components`. Shared helper functions and schemas in `src/helpers/`, not `app/**/_lib` or catch-all `lib/` helper files.
-- Feature plan files live in `docs/PRDs/`, named `NNN-<plan-slug>.md` (zero-padded sequence, kebab-case slug — e.g. `001-db-infrastructure.md`), and are referenced from `feature_list.json` via the `plan` field.
+- Feature plan files live in `docs/PRDs/`, named `NNN-<plan-slug>.md` (zero-padded sequence, kebab-case slug — e.g. `001-db-infrastructure.md`).
 - Imports: external packages first, then workspace packages (`@workspace/ui/...`), then app-local (`@/...`) — matching existing files.
 - Test files never live next to their source. All `*.test.ts`/`*.test.tsx` (including `.integration.test.ts`) live under `apps/web/tests/`, mirroring the `app/`, `lib/`, and `src/` tree — see `docs/architecture.md`'s "apps/web testing layout" section.
 

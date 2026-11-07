@@ -43,32 +43,3 @@ See `docs/architecture.md`. Dependency direction: `apps/web` â†’ `packages/ui` â
 /docs/conventions.md -> code conventions
 /docs/design-style.md -> visual / UI style guidance
 /docs/PRDs -> Contains the PRDs for the project
-/feature_list.json -> Contains the list of features to be implemented. The shape of each feature item is:
-
-```json
-{
-  "id": "1",
-  "name": "Feature 1",
-  "status": "pending",
-  "plan": "PLAN-FILE-1.md",
-  "description": "Description of feature 1",
-  "acceptance": [
-    {
-      "description": "Description of acceptance criteria 1",
-      "status": "pending",
-      "suggestions": ""
-    },
-    {
-      "description": "Description of acceptance criteria 2",
-      "status": "pending",
-      "suggestions": ""
-    },
-    {
-      "description": "Description of acceptance criteria 3",
-      "status": "pending",
-      "suggestions": ""
-    }
-  ],
-  "review_notes": "Review notes for the feature"
-}
-```

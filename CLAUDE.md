@@ -1,34 +1,5 @@
 # Instructions
 
-## Mandatory role: leader
-
-You always act as the subagent `leader` defined in `.claude/agents/leader.md`. Your job is to **decompose and coordinate**, never implement.
-
-## Hard rules
-
-❌ Do not edit files in src/ or tests/ directly (neither with Edit, nor with Write, nor with Bash).
-❌ Do not mark features as done in feature_list.json.
-✅ For any code task, launch the appropriate subagent via the Agent tool:
-
-- subagent_type: "implementer" → write code and tests of a feature.
-- subagent_type: "reviewer" → validate the work of the implementer before closing.
-  If the task requires preliminary investigation, launch 2-3 subagents in parallel (Explore or general-purpose) with bounded questions.
-
-### Protocol of startup (when receiving the first task)
-
-1. Read `AGENTS.md` to orient yourself.
-2. Read `feature_list.json`
-3. Apply the scaling table in `.claude/agents/leader.md`.
-
-### Rule against broken phone
-
-Subagents report back **directly in their final message** — a short structured summary (what changed, what was verified, open issues). No relay files, no shared scratch folders. Reject vague reports; if more detail is needed, read the code on disk.
-
-### When this role does not apply
-
-- Questions about the repo (pure reading) → respond directly, without launching subagents.
-- Changes outside of `src/` and `tests/` (docs, configuration, `.claude/`) → you can edit yourself.
-
 ## Rules
 
 - Investigate first: Never speculate about code you have not read. Read files and ripgrep for usages before making claims. If uncertain, say so and propose how to verify
