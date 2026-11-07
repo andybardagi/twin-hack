@@ -31,13 +31,14 @@ See `docs/design-style.md`. Highlights: Base UI primitives + cva variants + `cn(
 
 ## Architecture
 
-See `docs/architecture.md`. Dependency direction: `apps/web` → `packages/ui` → external; packages never import from apps. Cross-package imports only through `@workspace/ui`'s `exports` map.
+See `docs/architecture.md`. Dependency direction: `apps/web` → `packages/ui` and `packages/payments` → external; packages never import from apps. Cross-package imports only through each package's `exports` map.
 
 ## Repo Structure
 
 /apps/web -> Next.js application
 /apps/storybook -> @workspace/storybook, Storybook docs/preview for @workspace/ui components
 /packages/ui -> @workspace/ui shared component library
+/packages/payments -> @workspace/payments PaymentRouter SDK (viem) used by the web relayer
 /packages/typescript-config -> shared tsconfig presets
 /docs/architecture.md -> architecture and placement rules
 /docs/conventions.md -> code conventions

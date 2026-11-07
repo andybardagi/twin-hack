@@ -92,6 +92,11 @@ export BETTER_AUTH_URL='http://localhost:3000'
 pnpm dev
 ```
 
+To relay payments (`POST /api/payments/relay`), also set these server-only variables (never use `NEXT_PUBLIC_`):
+
+- `RELAYER_PRIVATE_KEY`: 0x-prefixed 32-byte hex key of the account that pays gas for `pay`. It needs Arbitrum ETH.
+- `ARBITRUM_RPC_URL`: optional Arbitrum One RPC URL; defaults to `https://arb1.arbitrum.io/rpc`.
+
 Open `http://localhost:3000/sign-in` with an EIP-6963 browser wallet enabled. Choose the detected wallet, connect,
 and sign the message. The message always uses Arbitrum (42161); login does not switch the wallet's network or send
 transactions. With no detected wallet, install or enable one and reload. No email, ENS, or WalletConnect is used.

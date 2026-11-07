@@ -162,6 +162,16 @@ Client Components call the API through Eden (`lib/api-client.ts`).
 - Tokens: `src/helpers/tokens.ts` derives the static list from `@workspace/payments/tokens` and adds a name,
   `fiatDecimals` (2, or 0 for CHLt), and `canPay` / `canCollect`.
 
+### Payment relayer
+
+- `app/api/payments/relay/route.ts` mounts `POST` from `lib/payments/relay.ts`. It requires a session (401), validates
+  the order, intent, signatures and optional permit (400), and requires `intent.payer` to be the session user's primary
+  wallet (403). It then calls `relayPayment` from `@workspace/payments` against `paymentRouterAddress`, which verifies,
+  simulates, sends `pay` from the relayer account, and waits for the receipt: 200 `{ hash, settled }` (uint256 values
+  as decimal strings) or 422 `{ error }` with the invalid-order reason or contract error name. RPC failures surface as 500.
+- The relayer env and viem clients (Arbitrum, viem `nonceManager`) are created lazily on the first request that passes
+  those checks; builds need no relayer env.
+
 ### apps/web testing layout
 
 All test files live under `apps/web/tests/`, mirroring the `app/`, `lib/`, and `src/` tree 1:1 — no `.test.ts`/`.test.tsx` files colocated next
