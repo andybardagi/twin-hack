@@ -1,4 +1,13 @@
-import { boolean, index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id").primaryKey(),
@@ -12,6 +21,20 @@ export const user = pgTable("user", {
     .$onUpdate(() => new Date())
     .notNull(),
 });
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid("id").primaryKey(),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "restrict" }),
+    tokenAddress: text("token_address").notNull(),
+    amount: numeric("amount", { precision: 78, scale: 0 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("orders_merchant_id_idx").on(table.merchantId)],
+);
 
 export const session = pgTable(
   "session",
