@@ -6,7 +6,7 @@ QR payments on Arbitrum: a merchant signs an order, the customer pays it with an
 
 Chain: Arbitrum One (chain ID 42161)
 
-PaymentRouter: <TBD>
+PaymentRouter: [`0x4DE32c75eecDF3229114F105293698284b261Bb1`](https://arbiscan.io/address/0x4DE32c75eecDF3229114F105293698284b261Bb1)
 
 Demo transactions: <TBD>
 
