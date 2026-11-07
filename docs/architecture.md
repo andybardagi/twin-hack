@@ -20,11 +20,13 @@ apps/web ────────► @workspace/ui ──► @base-ui/react, cva
 apps/storybook ──►      │
     │                   │
     └───────────────────┴──► @workspace/typescript-config (dev-only)
+apps/web ────────► @workspace/payments ──► viem
 ```
 
 - Apps depend on packages. **Packages never import from apps.**
 - `@workspace/ui` has no dependency on other workspace packages except the tsconfig preset.
 - Cross-package imports go through the `exports` map of `@workspace/ui` (`./components/*`, `./hooks/*`, `./lib/*`, `./globals.css`, `./postcss.config`) — never deep-import via relative paths across packages.
+- `apps/web` also imports `@workspace/payments` (through its `./*` exports map) for the gasless payment relayer.
 
 ## apps/web layout
 
@@ -82,6 +84,16 @@ ID generator uses `uuid`'s `v7()` for all auth records.
   wallet row using only the session user's ID. Missing addresses show a sign-out/retry message. Sign out invalidates
   the server session before navigating to `/sign-in`.
 - Contract calls and wallet views are deferred to a later PR.
+
+### Payment relayer
+
+- `app/api/payments/relay/route.ts` mounts `POST` from `lib/payments/relay.ts`. It requires a session (401), validates
+  the order, intent, signatures and optional permit (400), and requires `intent.payer` to be the session user's primary
+  wallet (403). It then calls `relayPayment` from `@workspace/payments` against `paymentRouterAddress`, which verifies,
+  simulates, sends `pay` from the relayer account, and waits for the receipt: 200 `{ hash, settled }` (uint256 values
+  as decimal strings) or 422 `{ error }` with the invalid-order reason or contract error name. RPC failures surface as 500.
+- The relayer env and viem clients (Arbitrum, viem `nonceManager`) are created lazily on the first request that passes
+  those checks; builds need no relayer env.
 
 ### apps/web testing layout
 
