@@ -4,7 +4,8 @@
 
 Choose the HTTP API framework and write the composition-root / ports-and-adapters layout into `docs/architecture.md` after the choice.
 
-Do not add product routes in this feature.
+Do not add product routes in this feature. Feature 004 mounts better-auth directly at
+`app/api/auth/[...all]/route.ts`; this does not choose a general API framework. Feature 003 remains pending.
 
 ## Suggested defaults (not locked)
 

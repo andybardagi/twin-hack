@@ -25,7 +25,7 @@
       "postcss": {
         "config": "postcss.config.mjs"
       },
-      "ignoreDependencies": ["@tanstack/react-form", "zod"]
+      "ignoreDependencies": ["@tanstack/react-form"]
     },
     "apps/storybook": {
       "entry": ["stories/**/*.stories.tsx"],

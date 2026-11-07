@@ -12,7 +12,8 @@
     "format": "oxfmt --check",
     "format:fix": "oxfmt .",
     "typecheck": "turbo typecheck",
-    "knip": "knip"
+    "knip": "knip",
+    "test": "pnpm --filter web test"
   },
   "devDependencies": {
     "@workspace/typescript-config": "workspace:*",
