@@ -1,4 +1,4 @@
-# On-chain P2P payments
+# On-chain P2P payments - Ponte
 
 QR payments on Arbitrum: a merchant signs an order, the customer pays it with any supported stablecoin, and `PaymentRouter` swaps through Curve so the merchant receives the token they asked for: the asked amount minus our 50 bps fee, deducted at settlement. Customers pay no gas; our relayer submits every payment. Full design in [project.md](./project.md).
 
