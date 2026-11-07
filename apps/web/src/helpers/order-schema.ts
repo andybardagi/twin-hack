@@ -5,7 +5,7 @@ import { tokens } from "@/src/helpers/tokens";
 
 export const orderInputSchema = z
   .object({
-    tokenAddress: z.string(),
+    tokenAddress: z.string().min(1, "Choose a token available for collection."),
     amount: z.string().regex(/^\d+(\.\d+)?$/, "Enter a positive decimal amount."),
   })
   .transform((input, context) => {

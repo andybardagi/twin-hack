@@ -24,8 +24,7 @@
       "next": true,
       "postcss": {
         "config": "postcss.config.mjs"
-      },
-      "ignoreDependencies": ["@tanstack/react-form"]
+      }
     },
     "apps/storybook": {
       "entry": ["stories/**/*.stories.tsx"],

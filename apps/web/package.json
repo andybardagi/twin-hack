@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@elysia/eden": "^1.4.10",
     "@tanstack/react-form": "^1.33.4",
     "@tanstack/react-query": "^5.101.4",
     "@workspace/ui": "workspace:*",

@@ -10,6 +10,25 @@ function tokenFor(symbol: string) {
   return token;
 }
 
+test("reports both field errors when token and amount are empty", () => {
+  const result = orderInputSchema.safeParse({ tokenAddress: "", amount: "" });
+
+  expect(result.success).toBe(false);
+  if (result.success) throw new Error("Expected empty order input to fail validation");
+  expect(result.error.issues).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        path: ["tokenAddress"],
+        message: "Choose a token available for collection.",
+      }),
+      expect.objectContaining({
+        path: ["amount"],
+        message: "Enter a positive decimal amount.",
+      }),
+    ]),
+  );
+});
+
 test.each([
   ["CHLt", "100.5"],
   ["CHLt", "100.0"],
