@@ -10,7 +10,7 @@ import { tokens as paymentTokens } from "@workspace/payments/tokens";
 import { GET, POST, type App } from "@/app/api/[[...slugs]]/route";
 import { GET as authGET } from "@/app/api/auth/[...all]/route";
 import { ordersRoutes } from "@/lib/api/orders-routes";
-import type { RouterReader, RouterReaderResult } from "@/lib/chain/router-reader";
+import type { Router, RouterReader } from "@/lib/chain/router-reader";
 import { getDb } from "@/lib/db/client";
 import { orders, user, verification } from "@/lib/db/schema";
 import { drizzleOrderRepository } from "@/lib/orders/drizzle-order-repository";
@@ -56,8 +56,8 @@ const routerReader: RouterReader = {
   feeBps: async () => 50,
   paid: async () => false,
 };
-function routerSource(reader: RouterReader = routerReader): () => RouterReaderResult {
-  return () => ({ status: "configured", routerAddress: paymentTokens.USDT0.address, reader });
+function routerSource(reader: RouterReader = routerReader): () => Router {
+  return () => ({ routerAddress: paymentTokens.USDT0.address, reader });
 }
 function ordersApp(source = routerSource(), repository = drizzleOrderRepository) {
   return new Elysia({ prefix: "/api" }).use(
@@ -135,19 +135,15 @@ test("reserves an order from session, server clock and router fee only", async (
 test("refuses to reserve without a router fee and stores nothing", async () => {
   const { merchantId, cookie } = await signIn();
   const logError = vi.spyOn(console, "error").mockImplementation(() => {});
-  for (const source of [
-    (): RouterReaderResult => ({ status: "not-configured" }),
-    routerSource({
-      ...routerReader,
-      feeBps: async () => {
-        throw new Error("RPC down");
-      },
-    }),
-  ]) {
-    const response = await ordersApp(source).fetch(orderRequest(validBody, cookie));
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ message: "Couldn't reach Arbitrum. Try again." });
-  }
+  const source = routerSource({
+    ...routerReader,
+    feeBps: async () => {
+      throw new Error("RPC down");
+    },
+  });
+  const response = await ordersApp(source).fetch(orderRequest(validBody, cookie));
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ message: "Couldn't reach Arbitrum. Try again." });
   expect(logError).toHaveBeenCalledOnce();
   expect(
     await getDb().select().from(orders).where(eq(orders.merchantId, merchantId)).limit(1),
@@ -326,19 +322,15 @@ test("asks to retry instead of reporting a status the chain couldn't confirm", a
   const { merchantId, cookie } = await signIn();
   const order = await createSignedOrder(merchantId);
   const logError = vi.spyOn(console, "error").mockImplementation(() => {});
-  for (const source of [
-    (): RouterReaderResult => ({ status: "not-configured" }),
-    routerSource({
-      ...routerReader,
-      paid: async () => {
-        throw new Error("RPC down");
-      },
-    }),
-  ]) {
-    const response = await ordersApp(source).fetch(statusRequest(order.id, cookie));
-    expect(response.status).toBe(503);
-    expect(await response.json()).toEqual({ message: "Couldn't reach Arbitrum. Try again." });
-  }
+  const source = routerSource({
+    ...routerReader,
+    paid: async () => {
+      throw new Error("RPC down");
+    },
+  });
+  const response = await ordersApp(source).fetch(statusRequest(order.id, cookie));
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({ message: "Couldn't reach Arbitrum. Try again." });
   expect(logError).toHaveBeenCalledOnce();
   expect(await storedSettledAt(order.id)).toBeNull();
 });

@@ -10,14 +10,14 @@ import { arbitrum } from "viem/chains";
 
 import { hashOrder, type Order } from "@workspace/payments/typed-data";
 
-import type { RouterReaderResult } from "@/lib/chain/router-reader";
+import type { Router } from "@/lib/chain/router-reader";
 
 // secp256k1 curve order n, halved. OpenZeppelin ECDSA rejects s above it.
 const secp256k1HalfOrder = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0n;
 
 /** Checks the signature against the merchant's current on-chain signing key; chain errors propagate. */
 export async function isSignedByMerchantKey(
-  { reader, routerAddress }: Extract<RouterReaderResult, { status: "configured" }>,
+  { reader, routerAddress }: Router,
   order: Order,
   signature: Hex,
 ): Promise<boolean> {

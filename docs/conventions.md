@@ -108,15 +108,16 @@ Optional:
 
 ## Orders locally
 
-Settings and orders read `PaymentRouter` on Arbitrum. Both variables are server-only and read at runtime:
+Settings and orders read the deployed `PaymentRouter` (`0x4DE32c75eecDF3229114F105293698284b261Bb1`) on Arbitrum
+through `https://arb1.arbitrum.io/rpc`, so no variables are needed. Both overrides are optional, server-only and read
+at runtime:
 
-- `PAYMENT_ROUTER_ADDRESS`: the deployed `PaymentRouter` address. Invalid or zero addresses throw.
-- `ARBITRUM_RPC_URL`: an HTTP(S) Arbitrum One RPC URL.
+- `PAYMENT_ROUTER_ADDRESS`: another `PaymentRouter` address, such as one on an Anvil fork. Invalid or zero
+  addresses throw.
+- `ARBITRUM_RPC_URL`: an HTTP(S) Arbitrum One RPC URL. Invalid URLs throw.
 
-With either missing, `/settings` hides the signing key and forward address and `/orders/new` says creating orders
-is not available yet; the pay page asks to try again. `PaymentRouter` is not deployed to Arbitrum yet, so point
-these at an Anvil fork with a locally deployed router to try the flow. The QR links to
-`$BETTER_AUTH_URL/pay/order/<id>`.
+When the RPC can't be reached, `/orders/new` and the pay page ask to try again and the API returns 503. The QR links
+to `$BETTER_AUTH_URL/pay/order/<id>`.
 
 ## Chain tests locally
 

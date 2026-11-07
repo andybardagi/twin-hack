@@ -43,12 +43,10 @@ export DATABASE_URL='postgresql://app:password@localhost:5433/app'
 pnpm --filter web db:migrate
 export BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
 export BETTER_AUTH_URL='http://localhost:3000'
-export PAYMENT_ROUTER_ADDRESS=0x...   # PaymentRouter to read; not deployed to Arbitrum yet
-export ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc
 pnpm dev
 ```
 
-`NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is optional and adds WalletConnect. Without `PAYMENT_ROUTER_ADDRESS` and `ARBITRUM_RPC_URL`, the app runs but signing key, forward address, and order creation show as not available. `pnpm build` needs none of these variables.
+The app reads the deployed PaymentRouter above through `https://arb1.arbitrum.io/rpc`. Set `PAYMENT_ROUTER_ADDRESS` or `ARBITRUM_RPC_URL` to override either, for example to point at an Anvil fork. `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is optional and adds WalletConnect. `pnpm build` needs none of these variables.
 
 `pnpm test` runs the web tests against Postgres. The chain tests fork Arbitrum with Anvil, deploy `PaymentRouter` from the Forge artifact, and also need Postgres:
 

@@ -40,7 +40,20 @@ function chain({ signingKey = device.address, paid = false } = {}) {
     feeBps: async () => 50,
     paid: async () => paid,
   };
-  return () => ({ status: "configured" as const, routerAddress, reader });
+  return () => ({ routerAddress, reader });
+}
+
+function unreachable() {
+  const reader: RouterReader = {
+    signingKeyOf: async () => {
+      throw new Error("RPC down");
+    },
+    feeBps: async () => 50,
+    paid: async () => {
+      throw new Error("RPC down");
+    },
+  };
+  return { routerAddress, reader };
 }
 
 async function createMerchant() {
@@ -122,32 +135,18 @@ test("missing, malformed and unsigned orders are not found", async () => {
   }
 });
 
-test("an unreachable or unconfigured chain is never a pass", async () => {
+test("an unreachable chain is never a pass", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   const order = await createSignedOrder();
-  const failing: RouterReader = {
-    signingKeyOf: async () => {
-      throw new Error("RPC down");
-    },
-    feeBps: async () => 50,
-    paid: async () => false,
-  };
-  const sources = [
-    () => ({ status: "configured" as const, routerAddress, reader: failing }),
-    () => ({ status: "not-configured" as const }),
-  ];
-  for (const source of sources) {
-    expect(await verifyPayOrder(order.id, drizzleOrderRepository, source)).toEqual({
-      status: "unverified",
-    });
-  }
+  expect(await verifyPayOrder(order.id, drizzleOrderRepository, unreachable)).toEqual({
+    status: "unverified",
+  });
 });
 
 test("no pay page state exposes the merchant address", async () => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   const open = await createSignedOrder();
   const expired = await createSignedOrder(new Date(Date.now() - 16 * 60 * 1000));
-  const unreachable = () => ({ status: "not-configured" as const });
   const views: PayOrder[] = [
     await verifyPayOrder(open.id, drizzleOrderRepository, chain()),
     await verifyPayOrder(open.id, drizzleOrderRepository, chain({ paid: true })),

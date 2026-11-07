@@ -15,7 +15,6 @@ import { arbitrum } from "viem/chains";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { paymentRouterAbi } from "@workspace/payments/abi";
-import { assertNever } from "@workspace/payments/assert-never";
 import { submitPayment } from "@workspace/payments/pay";
 import { tokens } from "@workspace/payments/tokens";
 import {
@@ -64,16 +63,7 @@ describe("RouterReader on an Arbitrum fork", () => {
 
     vi.stubEnv("PAYMENT_ROUTER_ADDRESS", domain.router);
     vi.stubEnv("ARBITRUM_RPC_URL", fork.rpcUrl);
-    const result = getRouterReader();
-    switch (result.status) {
-      case "configured":
-        reader = result.reader;
-        break;
-      case "not-configured":
-        throw new Error("Test router is not configured");
-      default:
-        assertNever(result);
-    }
+    reader = getRouterReader().reader;
   });
 
   afterAll(() => {

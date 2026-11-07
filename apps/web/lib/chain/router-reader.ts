@@ -6,6 +6,4 @@ export interface RouterReader {
   paid(merchant: Address, orderId: Hex): Promise<boolean>;
 }
 
-export type RouterReaderResult =
-  | { status: "not-configured" }
-  | { status: "configured"; routerAddress: Address; reader: RouterReader };
+export type Router = { routerAddress: Address; reader: RouterReader };

@@ -137,11 +137,11 @@ Client Components call the API through Eden (`lib/api-client.ts`).
 
 ### Chain
 
-- Arbitrum One only. `lib/chain/chain-config.ts` reads `PAYMENT_ROUTER_ADDRESS` and `ARBITRUM_RPC_URL` at runtime.
-  With either missing, the router is not configured and chain-dependent pages show a not-available state; builds
-  need neither. Invalid values throw.
-- `lib/chain/read-router.ts` turns a missing config or failed read into `null`, so callers report "try again" and
-  never treat it as a pass.
+- Arbitrum One only. `lib/chain/chain-config.ts` defaults to the deployed `PaymentRouter`
+  (`0x4DE32c75eecDF3229114F105293698284b261Bb1`) and `https://arb1.arbitrum.io/rpc`. `PAYMENT_ROUTER_ADDRESS` and
+  `ARBITRUM_RPC_URL` override them at runtime; invalid overrides throw. Builds need neither.
+- `lib/chain/read-router.ts` turns a failed read into `null`, so callers report "try again" and never treat it as a
+  pass.
 - Contract writes (`setSigningKey`, `setPayoutAddress`) are sent from the merchant's wallet with wagmi on
   `/settings`. The server never sends transactions.
 

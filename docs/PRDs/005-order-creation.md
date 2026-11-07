@@ -37,8 +37,9 @@ order page shows settlement as it happens. This also decides feature 003: Elysia
 - Settlement: the merchant order page polls `GET /api/orders/:id/status` every 3 seconds while the order is open.
   The server reads `paid(merchant, orderId)` and writes `settled_at` the first time it is true. Open, expired and
   paid derive from `expires_at` and `settled_at`; there is no status column.
-- `PAYMENT_ROUTER_ADDRESS` and `ARBITRUM_RPC_URL` are read at runtime. The build passes with neither, and pages
-  that need the chain show a not-available state until both are set.
+- The deployed `PaymentRouter` (`0x4DE32c75eecDF3229114F105293698284b261Bb1`) and `https://arb1.arbitrum.io/rpc`
+  are the defaults. `PAYMENT_ROUTER_ADDRESS` and `ARBITRUM_RPC_URL` override them at runtime, and invalid overrides
+  throw. The build needs neither.
 - `apps/web` depends on `@workspace/payments` for the ABI, tokens, `signOrder` and `hashOrder`.
 
 ## Out of scope

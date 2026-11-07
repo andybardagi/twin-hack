@@ -5,7 +5,6 @@ import { createConfig } from "wagmi";
 import { mock } from "wagmi/connectors";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 
-import { assertNever } from "@workspace/payments/assert-never";
 import { setSigningKey } from "@/components/settings/set-signing-key";
 import { getRouterReader } from "@/lib/chain/viem-router-reader";
 import { startRouterFork } from "./fork-harness";
@@ -23,30 +22,21 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 it("registers, rotates and revokes a key read through RouterReader", async () => {
-  const result = getRouterReader();
-  switch (result.status) {
-    case "not-configured":
-      throw new Error("Test router is not configured");
-    case "configured": {
-      const chain = { ...arbitrum, rpcUrls: { default: { http: [fork.rpcUrl] } } };
-      const config = createConfig({
-        chains: [chain],
-        connectors: [mock({ accounts: [merchant.address] })],
-        transports: { [arbitrum.id]: fork.transport },
-      });
-      const connector = config.connectors[0];
-      if (!connector) throw new Error("Missing test connector");
-      const testClient = createTestClient({ chain, mode: "anvil", transport: fork.transport });
-      await testClient.impersonateAccount({ address: merchant.address });
-      expect(await result.reader.signingKeyOf(merchant.address)).toBe(zeroAddress);
-      for (const key of [signer.address, merchant.address, zeroAddress]) {
-        await setSigningKey(config, connector, merchant.address, fork.domain.router, key);
-        expect(await result.reader.signingKeyOf(merchant.address)).toBe(key);
-      }
-      await testClient.stopImpersonatingAccount({ address: merchant.address });
-      break;
-    }
-    default:
-      assertNever(result);
+  const { reader } = getRouterReader();
+  const chain = { ...arbitrum, rpcUrls: { default: { http: [fork.rpcUrl] } } };
+  const config = createConfig({
+    chains: [chain],
+    connectors: [mock({ accounts: [merchant.address] })],
+    transports: { [arbitrum.id]: fork.transport },
+  });
+  const connector = config.connectors[0];
+  if (!connector) throw new Error("Missing test connector");
+  const testClient = createTestClient({ chain, mode: "anvil", transport: fork.transport });
+  await testClient.impersonateAccount({ address: merchant.address });
+  expect(await reader.signingKeyOf(merchant.address)).toBe(zeroAddress);
+  for (const key of [signer.address, merchant.address, zeroAddress]) {
+    await setSigningKey(config, connector, merchant.address, fork.domain.router, key);
+    expect(await reader.signingKeyOf(merchant.address)).toBe(key);
   }
+  await testClient.stopImpersonatingAccount({ address: merchant.address });
 });

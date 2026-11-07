@@ -2,8 +2,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAddress } from "viem";
 
-import { assertNever } from "@workspace/payments/assert-never";
-
 import { OrderSigningGate } from "@/components/orders/order-signing-gate";
 import { getAuth } from "@/lib/auth";
 import { getRouterReader } from "@/lib/chain/viem-router-reader";
@@ -17,29 +15,21 @@ async function orderContent(merchantId: string) {
     return <p role="alert">Your wallet couldn’t be found. Sign out and sign in again.</p>;
   }
   const merchant = getAddress(wallet);
-  const chain = getRouterReader();
-  switch (chain.status) {
-    case "not-configured":
-      return <p>Creating orders is not available yet. Try again later.</p>;
-    case "configured": {
-      // A failed read reaches the error boundary, which offers a retry; it never opens the form.
-      const [signingKey, settings] = await Promise.all([
-        chain.reader.signingKeyOf(merchant),
-        drizzleMerchantSettingsRepository.findByMerchantId(merchantId),
-      ]);
-      const defaultToken = settings && findCollectableToken(settings.defaultTokenAddress);
-      return (
-        <OrderSigningGate
-          merchant={merchant}
-          router={chain.routerAddress}
-          signingKey={signingKey}
-          defaultTokenAddress={defaultToken?.address ?? ""}
-        />
-      );
-    }
-    default:
-      return assertNever(chain);
-  }
+  const { routerAddress, reader } = getRouterReader();
+  // A failed read reaches the error boundary, which offers a retry; it never opens the form.
+  const [signingKey, settings] = await Promise.all([
+    reader.signingKeyOf(merchant),
+    drizzleMerchantSettingsRepository.findByMerchantId(merchantId),
+  ]);
+  const defaultToken = settings && findCollectableToken(settings.defaultTokenAddress);
+  return (
+    <OrderSigningGate
+      merchant={merchant}
+      router={routerAddress}
+      signingKey={signingKey}
+      defaultTokenAddress={defaultToken?.address ?? ""}
+    />
+  );
 }
 
 export default async function Page() {

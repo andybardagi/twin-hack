@@ -3,8 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAddress } from "viem";
 
-import { assertNever } from "@workspace/payments/assert-never";
-
 import { DefaultReceiveTokenSettings } from "@/components/settings/default-receive-token-settings";
 import { ForwardAddressSettings } from "@/components/settings/forward-address-settings";
 import { SettingsWagmiProvider } from "@/components/settings/settings-wagmi-provider";
@@ -18,38 +16,26 @@ export default async function Page() {
   const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) redirect("/sign-in");
   const merchant = await getPrimaryWalletAddress(session.user.id);
-  const config = getChainConfig();
+  const { routerAddress } = getChainConfig();
   function chainContent() {
     if (!merchant)
       return <p role="alert">Your wallet couldn’t be found. Sign out and sign in again.</p>;
-    switch (config.status) {
-      case "not-configured":
-        return (
-          <p>Signing key and forward address settings are not available yet. Try again later.</p>
-        );
-      case "configured":
-        return (
-          <SettingsWagmiProvider>
-            <section className="space-y-3" aria-labelledby="signing-key-heading">
-              <h2 id="signing-key-heading" className="text-lg font-medium">
-                Signing key
-              </h2>
-              <SigningKeySettings merchant={getAddress(merchant)} router={config.routerAddress} />
-            </section>
-            <section className="space-y-3" aria-labelledby="forward-address-heading">
-              <h2 id="forward-address-heading" className="text-lg font-medium">
-                Forward address
-              </h2>
-              <ForwardAddressSettings
-                merchant={getAddress(merchant)}
-                router={config.routerAddress}
-              />
-            </section>
-          </SettingsWagmiProvider>
-        );
-      default:
-        return assertNever(config);
-    }
+    return (
+      <SettingsWagmiProvider>
+        <section className="space-y-3" aria-labelledby="signing-key-heading">
+          <h2 id="signing-key-heading" className="text-lg font-medium">
+            Signing key
+          </h2>
+          <SigningKeySettings merchant={getAddress(merchant)} router={routerAddress} />
+        </section>
+        <section className="space-y-3" aria-labelledby="forward-address-heading">
+          <h2 id="forward-address-heading" className="text-lg font-medium">
+            Forward address
+          </h2>
+          <ForwardAddressSettings merchant={getAddress(merchant)} router={routerAddress} />
+        </section>
+      </SettingsWagmiProvider>
+    );
   }
   return (
     <main className="flex min-h-svh items-center justify-center bg-background px-8 py-16 text-foreground">
