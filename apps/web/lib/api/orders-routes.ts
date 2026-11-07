@@ -1,21 +1,10 @@
 import { Elysia } from "elysia";
-import {
-  getAddress,
-  hexToBigInt,
-  isAddressEqual,
-  parseSignature,
-  recoverAddress,
-  type Address,
-  type Hex,
-} from "viem";
-import { arbitrum } from "viem/chains";
+import { getAddress } from "viem";
 import { z } from "zod";
 
-import { assertNever } from "@workspace/payments/assert-never";
-import { hashOrder } from "@workspace/payments/typed-data";
-
-import type { RouterReaderResult } from "@/lib/chain/router-reader";
+import { readRouter, type RouterSource } from "@/lib/chain/read-router";
 import type { OrderRepository } from "@/lib/orders/order-repository";
+import { isSignedByMerchantKey } from "@/lib/orders/order-signature";
 import { reservationExpiresAt, toReservedOrder } from "@/lib/orders/reserved-order";
 import type { SessionReader } from "@/lib/session/session-reader";
 import { getPrimaryWalletAddress } from "@/lib/wallet-address";
@@ -29,44 +18,6 @@ import {
 const errorSchema = z.object({ message: z.string() });
 const chainUnavailable = { message: "Couldn't reach Arbitrum. Try again." };
 const notSignable = { message: "This order can no longer be signed. Create a new order." };
-
-type RouterSource = () => RouterReaderResult;
-
-/** Resolves to null when the chain can't answer, so callers can never treat that as a pass. */
-async function readRouter<T>(
-  source: RouterSource,
-  read: (router: Extract<RouterReaderResult, { status: "configured" }>) => Promise<T>,
-): Promise<T | null> {
-  const router = source();
-  switch (router.status) {
-    case "not-configured":
-      return null;
-    case "configured":
-      try {
-        return await read(router);
-      } catch (error) {
-        console.error(error);
-        return null;
-      }
-    default:
-      return assertNever(router);
-  }
-}
-
-// secp256k1 curve order n, halved. OpenZeppelin ECDSA rejects s above it.
-const secp256k1HalfOrder = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0n;
-
-async function isSignedBy(signingKey: Address, hash: Hex, signature: Hex) {
-  // viem throws on a malformed signature or one that recovers no key: just a wrong signature.
-  try {
-    // The router's OpenZeppelin ECDSA only accepts low-s signatures with v of 27 or 28.
-    const { s, v } = parseSignature(signature);
-    if (hexToBigInt(s) > secp256k1HalfOrder || (v !== 27n && v !== 28n)) return false;
-    return isAddressEqual(await recoverAddress({ hash, signature }), signingKey);
-  } catch {
-    return false;
-  }
-}
 
 export function ordersRoutes(
   repository: OrderRepository,
@@ -135,12 +86,8 @@ export function ordersRoutes(
         if (order.signature || order.expiresAt <= new Date()) return status(409, notSignable);
 
         const signed = toSignableOrder(toReservedOrder(order));
-        const valid = await readRouter(routerSource, async ({ reader, routerAddress }) =>
-          isSignedBy(
-            await reader.signingKeyOf(signed.merchant),
-            hashOrder({ chainId: arbitrum.id, router: routerAddress }, signed),
-            body.signature,
-          ),
+        const valid = await readRouter(routerSource, (router) =>
+          isSignedByMerchantKey(router, signed, body.signature),
         );
         if (valid === null) return status(503, chainUnavailable);
         if (!valid) {

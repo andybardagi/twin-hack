@@ -1,16 +1,17 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { OrderAmount } from "@/components/orders/order-amount";
+import { PayOrderStatus } from "@/components/orders/pay-order-status";
+import { getRouterReader } from "@/lib/chain/viem-router-reader";
 import { drizzleOrderRepository } from "@/lib/orders/drizzle-order-repository";
-import { formatOrderDisplay } from "@/src/helpers/order-display";
+import { verifyPayOrder } from "@/lib/orders/pay-order";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   await connection();
   const { id } = await params;
 
-  const order = await drizzleOrderRepository.findById(id);
-  if (!order) notFound();
+  const order = await verifyPayOrder(id, drizzleOrderRepository, getRouterReader);
+  if (order.status === "not-found") notFound();
 
   return (
     <main className="flex min-h-svh items-center justify-center bg-background px-8 py-16 text-foreground">
@@ -21,7 +22,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <h1 id="payment-request-heading" className="text-2xl font-semibold tracking-tight">
           Payment request
         </h1>
-        <OrderAmount {...formatOrderDisplay(order.amount, order.tokenAddress)} />
+        <PayOrderStatus order={order} retryHref={`/pay/order/${id}`} />
       </section>
     </main>
   );
