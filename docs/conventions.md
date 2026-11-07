@@ -21,7 +21,7 @@
 
 A change is not finished until `pnpm lint && pnpm typecheck && pnpm build` passes from the repo root.
 
-**Testing:** no test runner is configured yet. The first feature that needs tests must add Vitest (workspace-level) as part of its scope — flag this to the leader rather than skipping tests silently. When tests exist, they live under `apps/web/tests/` mirroring source (see `docs/architecture.md`).
+**Testing:** Vitest is configured in `apps/web`. Run `pnpm test` from the root (or `pnpm --filter web test`). Tests live under `apps/web/tests/` mirroring source (see `docs/architecture.md`). Integration tests require real Postgres with migrations applied; the default test URL is the local Docker URL below. Export `DATABASE_URL` to use a dedicated test database. Tests create and clean up their own auth records.
 
 **Unused code:** `pnpm knip` must stay clean. Configure `knip.json` before ignoring issues; never use broad `ignore` patterns.
 
@@ -32,7 +32,7 @@ A change is not finished until `pnpm lint && pnpm typecheck && pnpm build` passe
 - Server code uses `getDb()` from `@/lib/db/client` at runtime. Importing it is safe without `DATABASE_URL`;
   calling it without the variable throws an actionable error. Never import it into Client Components.
 - IDs are UUIDv7, generated in app code before insert. ID columns have no database default. Do not use serial IDs,
-  `gen_random_uuid()`, or a database UUIDv7 default. Add the `uuid` dependency and an ID helper only with their first consumer.
+  `gen_random_uuid()`, or a database UUIDv7 default. Auth uses `v7()` from `uuid` in better-auth’s ID generator.
 
 From the repo root, start the local database and export its template development URL:
 
@@ -58,7 +58,7 @@ pnpm --filter web db:migrate
 
 Generation uses `apps/web/drizzle.config.ts` and needs no connection or `DATABASE_URL`. Migration requires the URL
 and a running Postgres instance. Generated SQL and metadata live in `apps/web/lib/db/migrations/` and must be
-committed alongside schema changes. Until the first tables are added, there are no migrations to apply. Do not
+committed alongside schema changes. The initial migration defines auth tables. Do not
 create placeholder product tables. Review migration safety for existing rows before applying SQL; do not use
 schema push as a substitute for reviewed migrations.
 
@@ -71,6 +71,37 @@ import { getDb } from "@/lib/db/client";
 
 await getDb().execute(sql`select 1`);
 ```
+
+## Wallet login locally
+
+Server-only environment variables (never use `NEXT_PUBLIC_`):
+
+- `BETTER_AUTH_SECRET`: at least 32 random characters; generate a local value with `openssl rand -base64 32`.
+- `BETTER_AUTH_URL`: the app's public origin, locally `http://localhost:3000`. Its host (including port) must match
+  the domain users sign in on, because SIWE verifies that domain. Use the same host in the browser and config.
+- `ARBITRUM_RPC_URL`: an Arbitrum One RPC URL, consulted whenever local signature verification fails, including
+  invalid regular-wallet signatures, to support ERC-1271/6492 smart wallets. Unauthenticated requests can trigger
+  this fallback. Valid regular-wallet logins verify locally and need no RPC connection.
+- `DATABASE_URL`: the Postgres connection URL documented above.
+
+Start Postgres, wait for its healthcheck, and apply migrations using the commands above. Export the variables in
+the shell that starts Next.js, or put them in untracked `apps/web/.env.local` (never commit secrets or env files):
+
+```sh
+export BETTER_AUTH_SECRET="$(openssl rand -base64 32)"
+export BETTER_AUTH_URL='http://localhost:3000'
+export ARBITRUM_RPC_URL='https://arb1.arbitrum.io/rpc'
+pnpm dev
+```
+
+Open `http://localhost:3000/sign-in` with an EIP-6963 browser wallet enabled. Choose the detected wallet, connect,
+and sign the message. The message always uses Arbitrum (42161); login does not switch the wallet's network or send
+transactions. With no detected wallet, install or enable one and reload. No email, ENS, or WalletConnect is used.
+The home page shows the session user's primary wallet address. Sign out returns to `/sign-in`; visiting `/` without
+a session redirects there. Both themes use the shared neutral design tokens.
+
+`pnpm test` runs integration tests against Postgres plus client action tests. Test auth settings are supplied by
+Vitest; the RPC fallback tests use a local stub server. `pnpm build` requires none of these environment variables.
 
 ## Components (shadcn / Base UI pattern)
 

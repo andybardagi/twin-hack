@@ -15,6 +15,7 @@ export async function signInWallet(
 ): Promise<void> {
   const cachedConnection = config.state.connections.get(connector.uid);
   if (!cachedConnection && config.state.current === connector.uid) {
+    // wagmi keeps current after clearing connections on mount, so connect would throw.
     await disconnect(config, { connector });
   }
   const connection = cachedConnection ?? (await connect(config, { connector }));

@@ -1,19 +1,38 @@
-import { Button } from "@workspace/ui/components/button";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default function Page() {
+import { SignOutButton } from "@/components/auth/sign-out-button";
+import { getAuth } from "@/lib/auth";
+import { getPrimaryWalletAddress } from "@/lib/wallet-address";
+
+export default async function Page() {
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
+  if (!session) redirect("/sign-in");
+
+  const address = await getPrimaryWalletAddress(session.user.id);
+
   return (
-    <div className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-4 text-sm leading-loose">
-        <div>
-          <h1 className="font-medium">Project ready!</h1>
-          <p>You may now add components and start building.</p>
-          <p>We&apos;ve already added the button component for you.</p>
-          <Button className="mt-2">Button</Button>
-        </div>
-        <div className="text-muted-foreground font-mono text-xs">
-          (Press <kbd>d</kbd> to toggle dark mode)
-        </div>
-      </div>
-    </div>
+    <main className="flex min-h-svh items-center justify-center bg-background px-8 py-16 text-foreground">
+      <section
+        aria-labelledby="account-heading"
+        className="w-full max-w-lg space-y-6 rounded-xl border border-border bg-card p-6 text-card-foreground"
+      >
+        <h1 id="account-heading" className="text-2xl font-semibold tracking-tight">
+          Your account
+        </h1>
+        {address ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Signed in with</p>
+            <p className="break-all font-mono text-sm">{address}</p>
+          </div>
+        ) : (
+          <p role="alert" className="text-sm text-muted-foreground">
+            Your wallet address couldn’t be found. Sign out and sign in again to retry.
+          </p>
+        )}
+        <SignOutButton />
+      </section>
+    </main>
   );
 }

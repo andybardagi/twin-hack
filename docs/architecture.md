@@ -50,8 +50,7 @@ Keep `app/` route segments thin. Do not place route-private UI in `app/**/_compo
 
 Postgres is the database. Drizzle ORM uses the `pg` driver; drizzle-kit generates and applies SQL migrations.
 Persistence stays app-local under `apps/web/lib/db/` until a second consumer appears. `apps/web/drizzle.config.ts`
-reads `lib/db/schema.ts` and writes generated SQL and metadata to `lib/db/migrations/`. No tables are defined yet,
-so there are no initial migrations. Commit generated migrations alongside future schema changes.
+reads `lib/db/schema.ts` and writes generated SQL and metadata to `lib/db/migrations/`. Auth tables and the initial migration are defined. Commit generated migrations alongside schema changes.
 
 Server code imports `getDb` from `@/lib/db/client`. Importing the module does not read `DATABASE_URL` or create a
 pool. The first `getDb()` call requires `DATABASE_URL` and caches a Drizzle client backed by a `pg.Pool` for that
@@ -62,17 +61,35 @@ The root `docker-compose.yml` runs Postgres 17 with a healthcheck, a named data 
 localhost on host port 5433 to avoid conflicting with a database already using 5432. The connection URL and
 migration commands are documented in `docs/conventions.md`.
 
-Primary keys use UUIDv7 generated in app code before insert, with no database default on ID columns. The UUID
-dependency and ID helper will be added with the first consumer.
+Primary keys use UUIDv7 generated in app code before insert, with no database default on ID columns. Better-auth's
+ID generator uses `uuid`'s `v7()` for all auth records.
 
-The API framework remains undecided (feature 003); this foundation adds no API routes.
+### Authentication
+
+- `lib/auth.ts` lazily creates better-auth with the Drizzle adapter, anonymous SIWE plugin, and Next.js cookies
+  integration. Environment validation and database initialization happen at runtime; builds need no env variables.
+- `app/api/auth/[...all]/route.ts` mounts better-auth's GET/POST handlers directly. The general backend API framework
+  remains undecided (feature 003 is pending); authentication does not select Elysia or add product endpoints.
+- `lib/db/schema.ts` defines better-auth's user, session, account, verification, and wallet_address tables. Sessions
+  retain the better-auth default lifetime. SIWE requests use Arbitrum's chain ID (42161). EOA signatures verify locally
+  with viem; whenever local verification fails, including invalid regular-wallet signatures, `ARBITRUM_RPC_URL`
+  is consulted to support ERC-1271/6492 smart wallets. Unauthenticated requests can trigger this fallback. Valid
+  regular-wallet logins need no RPC. No ENS lookup.
+- `lib/auth-client.ts` holds the SIWE-enabled client. `lib/wagmi.ts` configures wagmi 3 for EIP-6963 wallet discovery;
+  `components/auth/` contains wallet sign-in, its provider, and sign out. No WalletConnect, wallet dialog, or network
+  switch is needed for login. TanStack Query mutations handle pending/error states and navigation after success.
+- `/sign-in` redirects existing sessions home; `/` uses `getAuth().api.getSession` with `await headers()` in the page
+  and redirects logged-out requests to `/sign-in`. No proxy is used. `lib/wallet-address.ts` fetches at most one primary
+  wallet row using only the session user's ID. Missing addresses show a sign-out/retry message. Sign out invalidates
+  the server session before navigating to `/sign-in`.
+- Contract calls and wallet views are deferred to a later PR.
 
 ### apps/web testing layout
 
 All test files live under `apps/web/tests/`, mirroring the `app/`, `lib/`, and `src/` tree 1:1 — no `.test.ts`/`.test.tsx` files colocated next
 to source. Example: `apps/web/src/helpers/generate-id.ts` is tested at `apps/web/tests/src/helpers/generate-id.test.ts`.
-When a test runner is added (the first feature that needs tests must add Vitest), `*.integration.test.ts` files live in the same
-mirrored location as their unit-test counterparts, distinguished by the `.integration.test.ts` suffix.
+Vitest is configured in `apps/web/vitest.config.ts`. `*.integration.test.ts` files live in the same mirrored location
+as unit tests and use real Postgres. Run `pnpm test` after migrations; no integration tests are silently skipped.
 
 ## apps/storybook layout
 
