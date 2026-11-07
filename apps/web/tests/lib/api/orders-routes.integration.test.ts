@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { tokens as paymentTokens } from "@workspace/payments/tokens";
 
-import { POST, type App } from "@/app/api/[[...slugs]]/route";
+import { GET, POST, type App } from "@/app/api/[[...slugs]]/route";
 import { GET as authGET } from "@/app/api/auth/[...all]/route";
 import { ordersRoutes } from "@/lib/api/orders-routes";
 import type { RouterReader, RouterReaderResult } from "@/lib/chain/router-reader";
@@ -15,8 +15,10 @@ import { getDb } from "@/lib/db/client";
 import { orders, user, verification } from "@/lib/db/schema";
 import { drizzleOrderRepository } from "@/lib/orders/drizzle-order-repository";
 import { betterAuthSessionReader } from "@/lib/session/better-auth-session-reader";
+import { orderIdToBytes32 } from "@/src/helpers/order-id";
 import { reservedOrderSchema } from "@/src/helpers/order-schema";
 import { tokens } from "@/src/helpers/tokens";
+import { createSignedOrder, reservationInput } from "../orders/order-fixture";
 import { signInMerchant } from "./sign-in-merchant";
 
 const baseURL = "http://localhost:3000";
@@ -32,6 +34,19 @@ function orderRequest(body: unknown, cookie = ""): Request {
     headers: { "Content-Type": "application/json", cookie },
     body: JSON.stringify(body),
   });
+}
+
+function statusRequest(id: string, cookie = ""): Request {
+  return new Request(`${baseURL}/api/orders/${id}/status`, { headers: { cookie } });
+}
+
+async function storedSettledAt(id: string) {
+  const [stored] = await getDb()
+    .select({ settledAt: orders.settledAt })
+    .from(orders)
+    .where(eq(orders.id, id))
+    .limit(1);
+  return stored?.settledAt;
 }
 
 const signIn = () => signInMerchant(addresses, nonceIdentifiers);
@@ -233,4 +248,97 @@ test("rejects malformed JSON without exposing parser errors", async () => {
   );
   expect(response.status).toBe(400);
   expect(await response.json()).toEqual({ message: "Send a valid JSON body, then try again." });
+});
+
+test("reports an open order, then settles it once the router reports it paid", async () => {
+  const { merchantId, cookie } = await signIn();
+  const order = await createSignedOrder(merchantId);
+  const paid = vi.fn(async () => false);
+  const app = ordersApp(routerSource({ ...routerReader, paid }));
+
+  const open = await app.fetch(statusRequest(order.id, cookie));
+  expect(open.status).toBe(200);
+  expect(await open.json()).toEqual({ status: "open" });
+  expect(paid).toHaveBeenCalledWith(order.merchantAddress, orderIdToBytes32(order.id));
+  expect(await storedSettledAt(order.id)).toBeNull();
+
+  paid.mockResolvedValue(true);
+  const settled = await app.fetch(statusRequest(order.id, cookie));
+  expect(await settled.json()).toEqual({ status: "paid" });
+  const settledAt = await storedSettledAt(order.id);
+  expect(settledAt).toBeInstanceOf(Date);
+
+  paid.mockClear();
+  const again = await app.fetch(statusRequest(order.id, cookie));
+  expect(await again.json()).toEqual({ status: "paid" });
+  expect(paid).not.toHaveBeenCalled();
+  expect(await storedSettledAt(order.id)).toEqual(settledAt);
+});
+
+test("reports an expired order unless it was paid before expiring", async () => {
+  const { merchantId, cookie } = await signIn();
+  const order = await createSignedOrder(merchantId);
+  await getDb()
+    .update(orders)
+    .set({ expiresAt: new Date(Date.now() - 60_000) })
+    .where(eq(orders.id, order.id));
+
+  const expired = await ordersApp().fetch(statusRequest(order.id, cookie));
+  expect(expired.status).toBe(200);
+  expect(await expired.json()).toEqual({ status: "expired" });
+  expect(await storedSettledAt(order.id)).toBeNull();
+
+  const paid = await ordersApp(routerSource({ ...routerReader, paid: async () => true })).fetch(
+    statusRequest(order.id, cookie),
+  );
+  expect(await paid.json()).toEqual({ status: "paid" });
+  expect(await storedSettledAt(order.id)).toBeInstanceOf(Date);
+});
+
+test("hides other merchants' orders and unsigned reservations", async () => {
+  const { merchantId } = await signIn();
+  const other = await signIn();
+  const order = await createSignedOrder(merchantId);
+  const unsigned = await drizzleOrderRepository.create(reservationInput(other.merchantId));
+  const paid = vi.fn(async () => true);
+  const app = ordersApp(routerSource({ ...routerReader, paid }));
+
+  for (const id of [order.id, unsigned.id, v7(), "not-a-uuid"]) {
+    const response = await app.fetch(statusRequest(id, other.cookie));
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ message: "Order not found." });
+  }
+  expect(paid).not.toHaveBeenCalled();
+  expect(await storedSettledAt(order.id)).toBeNull();
+});
+
+test("requires a valid session to read an order status", async () => {
+  const { merchantId } = await signIn();
+  const order = await createSignedOrder(merchantId);
+  for (const cookie of ["", "better-auth.session_token=invalid"]) {
+    const response = await GET(statusRequest(order.id, cookie));
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ message: "Sign in to check this order." });
+  }
+});
+
+test("asks to retry instead of reporting a status the chain couldn't confirm", async () => {
+  const { merchantId, cookie } = await signIn();
+  const order = await createSignedOrder(merchantId);
+  const logError = vi.spyOn(console, "error").mockImplementation(() => {});
+  for (const source of [
+    (): RouterReaderResult => ({ status: "not-configured" }),
+    routerSource({
+      ...routerReader,
+      paid: async () => {
+        throw new Error("RPC down");
+      },
+    }),
+  ]) {
+    const response = await ordersApp(source).fetch(statusRequest(order.id, cookie));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ message: "Couldn't reach Arbitrum. Try again." });
+  }
+  expect(logError).toHaveBeenCalledOnce();
+  expect(await storedSettledAt(order.id)).toBeNull();
 });

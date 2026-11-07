@@ -92,6 +92,20 @@ test("attaches a signature once and never to an expired order", async () => {
   expect(await drizzleOrderRepository.findById(expired.id)).toBeNull();
 });
 
+test("writes settled_at once, even under concurrent settles", async () => {
+  const merchantId = await createMerchant();
+  const order = await createSignedOrder(merchantId);
+
+  const [first, second] = await Promise.all([
+    drizzleOrderRepository.markSettled(order.id),
+    drizzleOrderRepository.markSettled(order.id),
+  ]);
+  expect(first.settledAt).toBeInstanceOf(Date);
+  expect(second.settledAt).toEqual(first.settledAt);
+  const again = await drizzleOrderRepository.markSettled(order.id);
+  expect(again).toEqual({ ...order, settledAt: first.settledAt });
+});
+
 test("returns null for an unknown order UUID", async () => {
   expect(await drizzleOrderRepository.findById(v7())).toBeNull();
 });

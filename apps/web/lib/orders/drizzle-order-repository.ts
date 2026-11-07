@@ -43,4 +43,17 @@ export const drizzleOrderRepository: OrderRepository = {
       .returning();
     return order ?? null;
   },
+  async markSettled(id) {
+    const [settled] = await getDb()
+      .update(orders)
+      .set({ settledAt: new Date() })
+      .where(and(eq(orders.id, id), isNull(orders.settledAt)))
+      .returning();
+    if (settled) return settled;
+
+    // A concurrent poll settled it first; keep that timestamp.
+    const [order] = await getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
+    if (!order) throw new Error(`Cannot settle missing order ${id}.`);
+    return order;
+  },
 };

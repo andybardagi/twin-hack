@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import { OrderAmount } from "@/components/orders/order-amount";
-import { OrderQrCode } from "@/components/orders/order-qr-code";
+import { OrderSettlement } from "@/components/orders/order-settlement";
 import { getAuth } from "@/lib/auth";
 import { findMerchantOrder } from "@/lib/orders/find-merchant-order";
 import { formatOrderDisplay } from "@/src/helpers/order-display";
@@ -30,8 +30,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           Order
         </h1>
         <OrderAmount {...formatOrderDisplay(order.amount, order.tokenAddress)} />
-        <OrderQrCode url={payUrl} />
-        <p className="text-sm text-muted-foreground">Scan the QR code to view this order.</p>
+        <OrderSettlement id={order.id} payUrl={payUrl} />
       </section>
     </main>
   );

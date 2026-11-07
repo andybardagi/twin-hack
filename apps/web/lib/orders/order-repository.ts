@@ -9,4 +9,6 @@ export interface OrderRepository {
   findForSigning(id: string, merchantId: string): Promise<Order | null>;
   /** Returns null unless the order is still unsigned and unexpired. */
   attachSignature(id: string, signature: string): Promise<Order | null>;
+  /** Writes settled_at only while it is null; returns the order with the first write's timestamp. */
+  markSettled(id: string): Promise<Order>;
 }

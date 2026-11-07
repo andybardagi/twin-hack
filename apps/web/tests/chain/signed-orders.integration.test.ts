@@ -1,13 +1,11 @@
 import { inArray } from "drizzle-orm";
 import {
-  createTestClient,
   createWalletClient,
   getAddress,
   hexToBigInt,
   isHex,
   keccak256,
   numberToHex,
-  parseEther,
   parseSignature,
   recoverAddress,
   toHex,
@@ -29,7 +27,7 @@ import { drizzleOrderRepository } from "@/lib/orders/drizzle-order-repository";
 import { reservationExpiresAt, toReservedOrder } from "@/lib/orders/reserved-order";
 import { reservedOrderSchema, toSignableOrder } from "@/src/helpers/order-schema";
 import { signInMerchant } from "../lib/api/sign-in-merchant";
-import { startRouterFork } from "./fork-harness";
+import { registerSigningKey, startRouterFork } from "./fork-harness";
 
 const baseURL = "http://localhost:3000";
 const owner = privateKeyToAccount(keccak256(toHex("signed-orders-test-owner")));
@@ -74,28 +72,6 @@ function sign(account: PrivateKeyAccount, order: Order) {
   return signOrder(signer, fork.domain, order);
 }
 
-async function registerSigningKey(merchant: Hex) {
-  const testClient = createTestClient({
-    chain: arbitrum,
-    mode: "anvil",
-    transport: fork.transport,
-  });
-  await testClient.setBalance({ address: merchant, value: parseEther("1") });
-  await testClient.impersonateAccount({ address: merchant });
-  const hash = await createWalletClient({
-    account: merchant,
-    chain: arbitrum,
-    transport: fork.transport,
-  }).writeContract({
-    address: fork.domain.router,
-    abi: paymentRouterAbi,
-    functionName: "setSigningKey",
-    args: [device.address],
-  });
-  await fork.publicClient.waitForTransactionReceipt({ hash });
-  await testClient.stopImpersonatingAccount({ address: merchant });
-}
-
 function simulatePay(order: Order, merchantSig: Hex) {
   return fork.publicClient.simulateContract({
     account: owner,
@@ -135,7 +111,7 @@ function yParityV(signature: Hex): Hex {
 it("reserves, signs with the device key and stores an order the router accepts", async () => {
   const { merchantId, cookie } = await signInMerchant(addresses, nonceIdentifiers);
   const merchant = getAddress(z.string().parse(addresses.at(-1)));
-  await registerSigningKey(merchant);
+  await registerSigningKey(fork, merchant, device.address);
 
   const reserveResponse = await post(
     "/orders",
@@ -204,7 +180,7 @@ it("reserves, signs with the device key and stores an order the router accepts",
 it("refuses to attach a valid signature to an expired order", async () => {
   const { merchantId, cookie } = await signInMerchant(addresses, nonceIdentifiers);
   const merchant = getAddress(z.string().parse(addresses.at(-1)));
-  await registerSigningKey(merchant);
+  await registerSigningKey(fork, merchant, device.address);
   const expired = await drizzleOrderRepository.create({
     merchantId,
     merchantAddress: merchant,

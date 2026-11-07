@@ -5,12 +5,15 @@ import { z } from "zod";
 import { readRouter, type RouterSource } from "@/lib/chain/read-router";
 import type { OrderRepository } from "@/lib/orders/order-repository";
 import { isSignedByMerchantKey } from "@/lib/orders/order-signature";
+import { settleOrder } from "@/lib/orders/order-settlement";
 import { reservationExpiresAt, toReservedOrder } from "@/lib/orders/reserved-order";
 import type { SessionReader } from "@/lib/session/session-reader";
 import { getPrimaryWalletAddress } from "@/lib/wallet-address";
+import { orderIdToBytes32 } from "@/src/helpers/order-id";
 import {
   orderInputSchema,
   orderSignatureSchema,
+  orderStatusSchema,
   reservedOrderSchema,
   toSignableOrder,
 } from "@/src/helpers/order-schema";
@@ -123,6 +126,39 @@ export function ordersRoutes(
               console.error(error);
               return status(500, { message: "Couldn't sign the order. Try again." });
           }
+        },
+      },
+    )
+    .get(
+      "/orders/:id/status",
+      async ({ params, request, status }) => {
+        const session = await sessions.read(request.headers);
+        if (!session) return status(401, { message: "Sign in to check this order." });
+
+        const order = await repository.findById(params.id);
+        if (!order || order.merchantId !== session.userId) {
+          return status(404, { message: "Order not found." });
+        }
+
+        const orderStatus = await settleOrder(order, repository, () =>
+          readRouter(routerSource, ({ reader }) =>
+            reader.paid(getAddress(order.merchantAddress), orderIdToBytes32(order.id)),
+          ),
+        );
+        if (orderStatus === null) return status(503, chainUnavailable);
+        return { status: orderStatus };
+      },
+      {
+        response: {
+          200: orderStatusSchema,
+          401: errorSchema,
+          404: errorSchema,
+          500: errorSchema,
+          503: errorSchema,
+        },
+        error({ error, status }) {
+          console.error(error);
+          return status(500, { message: "Couldn't check the payment status. Try again." });
         },
       },
     );

@@ -63,6 +63,10 @@ export const orderSignatureSchema = z.object({
   ),
 });
 
+export const orderStatusSchema = z.object({ status: z.enum(["open", "expired", "paid"]) });
+
+export type OrderStatus = z.infer<typeof orderStatusSchema>["status"];
+
 export function toSignableOrder({
   id,
   merchant,

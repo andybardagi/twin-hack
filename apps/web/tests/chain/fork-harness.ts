@@ -9,6 +9,7 @@ import {
   http,
   isHex,
   parseEther,
+  type Address,
   type PublicClient,
   type Transport,
 } from "viem";
@@ -138,4 +139,28 @@ export async function startRouterFork(
     anvil.kill();
     throw error;
   }
+}
+
+type RouterFork = Awaited<ReturnType<typeof startRouterFork>>;
+
+export async function registerSigningKey(fork: RouterFork, merchant: Address, signingKey: Address) {
+  const testClient = createTestClient({
+    chain: arbitrum,
+    mode: "anvil",
+    transport: fork.transport,
+  });
+  await testClient.setBalance({ address: merchant, value: parseEther("1") });
+  await testClient.impersonateAccount({ address: merchant });
+  const hash = await createWalletClient({
+    account: merchant,
+    chain: arbitrum,
+    transport: fork.transport,
+  }).writeContract({
+    address: fork.domain.router,
+    abi: paymentRouterAbi,
+    functionName: "setSigningKey",
+    args: [signingKey],
+  });
+  await fork.publicClient.waitForTransactionReceipt({ hash });
+  await testClient.stopImpersonatingAccount({ address: merchant });
 }
