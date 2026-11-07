@@ -15,8 +15,9 @@ Contract calls and wallet views are deferred to a later PR. Feature 003 remains 
 - Arbitrum only (42161) in every sign-in message; no network switch for login. viem verifies regular wallets locally.
   Only regular wallets are supported; smart wallets such as Safe cannot sign in. Malformed and contract-style
   signatures return 401.
-- wagmi 3 discovers EIP-6963 wallets. `/sign-in` shows one button per wallet, or a no-wallet install hint.
-  No dialog, WalletConnect, RainbowKit, or ConnectKit.
+- wagmi 3 discovers EIP-6963 wallets and adds WalletConnect when `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is set, so
+  mobile wallets can sign in. `/sign-in` shows one button per wallet, or a no-wallet install hint. WalletConnect uses
+  its own QR/wallet modal. No RainbowKit or ConnectKit.
 - `/` checks the session server-side with next/headers and redirects to `/sign-in` when logged out. No proxy.
   A single bounded database query loads the primary wallet by session user ID, never client input.
 - Home shows the wallet address in monospace and a sign-out button. TanStack Query handles sign-out pending/error
