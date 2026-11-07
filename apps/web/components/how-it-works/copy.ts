@@ -171,7 +171,7 @@ const en = {
         body: "Merchants can send every payment to another address they set on-chain, like a treasury or an exchange account.",
       },
       {
-        title: "Cash out to pesos with Belo",
+        title: "Cash out to fiat with Belo",
         body: "Point payouts at a Belo address and convert them to pesos at no cost.",
       },
     ],
@@ -437,7 +437,7 @@ const es: typeof en = {
         body: "El comercio puede enviar cada pago a otra dirección que define on-chain, como una tesorería o una cuenta de exchange.",
       },
       {
-        title: "A pesos con Belo",
+        title: "A fiat con Belo",
         body: "Apunta los cobros a una dirección de Belo y conviértelos a pesos sin costo.",
       },
     ],
@@ -703,7 +703,7 @@ const pt: typeof en = {
         body: "O comerciante pode enviar cada pagamento para outro endereço definido on-chain, como uma tesouraria ou uma conta de exchange.",
       },
       {
-        title: "Para pesos com a Belo",
+        title: "Para fiat com a Belo",
         body: "Aponte os recebimentos para um endereço da Belo e converta para pesos sem custo.",
       },
     ],
