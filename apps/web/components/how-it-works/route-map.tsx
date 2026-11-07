@@ -1,10 +1,17 @@
 import { Fragment } from "react";
 
 import { ArrowIcon } from "@/components/how-it-works/icons";
-import { TokenChip } from "@/components/how-it-works/token-chip";
+import { TokenChip, TokenText } from "@/components/how-it-works/token-chip";
+import { tokens } from "@/src/helpers/tokens";
 import type { Copy } from "@/components/how-it-works/copy";
 
 const twinTokens = ["ARGt", "BRAt", "COLt", "PERt", "MEXt", "CHLt", "BOLt"];
+
+function tokenIcon(symbol: string) {
+  const token = tokens.find((candidate) => candidate.symbol === symbol);
+  if (!token) throw new Error(`Unknown token: ${symbol}`);
+  return token.icon;
+}
 const mapCenter = 160;
 const mapRadius = 122;
 
@@ -34,21 +41,35 @@ function TokenHub({ label }: { label: string }) {
       {spokes.map(({ symbol, x, y }) => (
         <g key={symbol}>
           <circle cx={x} cy={y} r="30" className="fill-card stroke-border" strokeWidth="1.5" />
+          <image
+            href={tokenIcon(symbol)}
+            x={Number(x) - 10}
+            y={Number(y) - 20}
+            width="20"
+            height="20"
+          />
           <text
             x={x}
-            y={y}
+            y={Number(y) + 11}
             textAnchor="middle"
             dominantBaseline="central"
-            className="fill-foreground font-mono text-xs font-medium"
+            className="fill-foreground font-mono text-[0.65rem] font-medium"
           >
             {symbol}
           </text>
         </g>
       ))}
       <circle cx={mapCenter} cy={mapCenter} r="40" className="fill-primary" />
+      <image
+        href={tokenIcon("USDT")}
+        x={mapCenter - 14}
+        y={mapCenter - 26}
+        width="28"
+        height="28"
+      />
       <text
         x={mapCenter}
-        y={mapCenter}
+        y={mapCenter + 14}
         textAnchor="middle"
         dominantBaseline="central"
         className="fill-primary-foreground font-mono text-sm font-semibold"
@@ -86,8 +107,12 @@ function RouteCard({
         ))}
       </div>
       <div>
-        <h3 className="font-medium">{title}</h3>
-        <p className="text-sm text-muted-foreground">{body}</p>
+        <h3 className="font-medium">
+          <TokenText>{title}</TokenText>
+        </h3>
+        <p className="text-sm text-muted-foreground">
+          <TokenText>{body}</TokenText>
+        </p>
       </div>
     </li>
   );
