@@ -35,6 +35,9 @@ export default async function Page() {
           </p>
         )}
         <Button render={<Link href="/orders/new" />}>New order</Button>
+        <Button variant="outline" render={<Link href="/settings" />}>
+          Settings
+        </Button>
         <SignOutButton />
       </section>
     </main>
