@@ -52,6 +52,13 @@ test("returns null for an unknown order UUID", async () => {
   expect(await drizzleOrderRepository.findById(v7())).toBeNull();
 });
 
+test.each(["abc", "", "1", "01900000-0000-7000-8000-00000000000z"])(
+  "returns null for malformed id %s before Postgres can reject it",
+  async (id) => {
+    expect(await drizzleOrderRepository.findById(id)).toBeNull();
+  },
+);
+
 test("restricts deleting a merchant who owns an order", async () => {
   const merchantId = await createMerchant();
   const token = tokens.find((token) => token.symbol === "ARGt");

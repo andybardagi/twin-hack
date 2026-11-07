@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { v7 } from "uuid";
+import { z } from "zod";
 
 import { getDb } from "@/lib/db/client";
 import { orders } from "@/lib/db/schema";
@@ -15,6 +16,8 @@ export const drizzleOrderRepository: OrderRepository = {
     return order;
   },
   async findById(id) {
+    if (!z.uuid().safeParse(id).success) return null;
+
     const [order] = await getDb().select().from(orders).where(eq(orders.id, id)).limit(1);
     return order ?? null;
   },
